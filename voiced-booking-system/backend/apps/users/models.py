@@ -4,7 +4,7 @@ from django.core.validators import EmailValidator
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from apps.core.mixins import TimestampMixin
+from apps.core.mixins import TimestampMixin, UUIDMixin
 
 
 class UserManager(BaseUserManager):
@@ -162,3 +162,113 @@ class UserProfile(TimestampMixin):
 
     def __str__(self):
         return f'{self.user.email} Profile'
+
+
+class UserSession(UUIDMixin, TimestampMixin):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='sessions',
+        verbose_name=_('user')
+    )
+    token_jti = models.CharField(
+        _('JWT ID'),
+        max_length=255,
+        unique=True,
+        db_index=True
+    )
+    device_info = models.JSONField(_('device information'), default=dict, blank=True)
+    ip_address = models.GenericIPAddressField(_('IP address'))
+    user_agent = models.TextField(_('user agent'), blank=True)
+    expires_at = models.DateTimeField(_('expires at'))
+    revoked_at = models.DateTimeField(_('revoked at'), null=True, blank=True)
+    last_activity = models.DateTimeField(_('last activity'), auto_now=True)
+    
+    class Meta:
+        verbose_name = _('User Session')
+        verbose_name_plural = _('User Sessions')
+        db_table = 'user_sessions'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'expires_at']),
+            models.Index(fields=['token_jti']),
+            models.Index(fields=['ip_address', 'created_at']),
+            models.Index(fields=['expires_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user.email} - {self.created_at}"
+    
+    @property
+    def is_expired(self):
+        from django.utils import timezone
+        return self.expires_at < timezone.now()
+    
+    @property
+    def is_active(self):
+        return not self.is_expired and not self.revoked_at
+    
+    def revoke(self):
+        from django.utils import timezone
+        self.revoked_at = timezone.now()
+        self.save()
+
+
+class LoginAttempt(UUIDMixin, TimestampMixin):
+    FAILURE_REASONS = [
+        ('invalid_credentials', _('Invalid credentials')),
+        ('account_disabled', _('Account disabled')),
+        ('account_locked', _('Account locked')),
+        ('rate_limited', _('Rate limited')),
+        ('invalid_2fa', _('Invalid 2FA code')),
+        ('other', _('Other')),
+    ]
+    
+    email = models.EmailField(_('email attempted'), db_index=True)
+    ip_address = models.GenericIPAddressField(_('IP address'), db_index=True)
+    user_agent = models.TextField(_('user agent'), blank=True)
+    success = models.BooleanField(_('successful'))
+    failure_reason = models.CharField(_('failure reason'), max_length=100, blank=True, choices=FAILURE_REASONS)
+    user_found = models.BooleanField(_('user found'), default=False)
+    country = models.CharField(_('country'), max_length=100, blank=True)
+    city = models.CharField(_('city'), max_length=100, blank=True)
+    
+    class Meta:
+        verbose_name = _('Login Attempt')
+        verbose_name_plural = _('Login Attempts')
+        db_table = 'login_attempts'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['email', 'created_at']),
+            models.Index(fields=['ip_address', 'created_at']),
+            models.Index(fields=['success', 'created_at']),
+            models.Index(fields=['created_at']),
+        ]
+    
+    def __str__(self):
+        status = "✓" if self.success else "✗"
+        return f"{status} {self.email} from {self.ip_address}"
+    
+    @classmethod
+    def get_recent_failures_for_email(cls, email, minutes=15):
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        cutoff = timezone.now() - timedelta(minutes=minutes)
+        return cls.objects.filter(
+            email=email,
+            success=False,
+            created_at__gte=cutoff
+        ).count()
+    
+    @classmethod
+    def get_recent_failures_for_ip(cls, ip_address, minutes=15):
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        cutoff = timezone.now() - timedelta(minutes=minutes)
+        return cls.objects.filter(
+            ip_address=ip_address,
+            success=False,
+            created_at__gte=cutoff
+        ).count()

@@ -48,6 +48,9 @@ class SoftDeleteQuerySet(models.QuerySet):
     
     def delete(self):
         return self.update(deleted_at=timezone.now())
+    
+    def hard_delete(self):
+        return super().delete()
 
 
 class SoftDeleteManager(models.Manager):
@@ -56,6 +59,9 @@ class SoftDeleteManager(models.Manager):
     
     def with_deleted(self):
         return SoftDeleteQuerySet(self.model, using=self._db)
+    
+    def deleted_only(self):
+        return SoftDeleteQuerySet(self.model, using=self._db).deleted()
 
 
 class SoftDeleteMixin(models.Model):
@@ -84,6 +90,13 @@ class SoftDeleteMixin(models.Model):
         self.deleted_at = None
         self.deleted_by = None
         self.save()
+    
+    def hard_delete(self):
+        super().delete()
+    
+    @property
+    def is_deleted(self):
+        return self.deleted_at is not None
 
 
 class TenantMixin(models.Model):

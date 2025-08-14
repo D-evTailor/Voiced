@@ -1,9 +1,9 @@
 from django.conf import settings
-from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from apps.core.mixins import UUIDMixin, TimestampMixin
+from apps.core.utils import PHONE_REGEX_VALIDATOR, LANGUAGE_CHOICES, CURRENCY_CHOICES
 import uuid
 
 class Business(UUIDMixin, TimestampMixin):
@@ -34,13 +34,9 @@ class Business(UUIDMixin, TimestampMixin):
         _('business email'),
         help_text=_('Main business contact email')
     )
-    phone_regex = RegexValidator(
-        regex=r'^\+?1?\d{9,15}$',
-        message=_('Phone number must be entered in the format: "+999999999". Up to 15 digits allowed.')
-    )
     phone = models.CharField(
         _('phone number'),
-        validators=[phone_regex],
+        validators=[PHONE_REGEX_VALIDATOR],
         max_length=17,
         help_text=_('Business phone number')
     )
@@ -73,10 +69,7 @@ class Business(UUIDMixin, TimestampMixin):
     locale = models.CharField(
         _('business locale'),
         max_length=10,
-        choices=[
-            ('es', _('Spanish')),
-            ('en', _('English')),
-        ],
+        choices=LANGUAGE_CHOICES,
         default='es',
         help_text=_('Primary language for this business')
     )
@@ -89,11 +82,7 @@ class Business(UUIDMixin, TimestampMixin):
     currency = models.CharField(
         _('currency'),
         max_length=3,
-        choices=[
-            ('EUR', _('Euro')),
-            ('USD', _('US Dollar')),
-            ('GBP', _('British Pound')),
-        ],
+        choices=CURRENCY_CHOICES,
         default='EUR',
         help_text=_('Currency for pricing')
     )
