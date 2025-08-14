@@ -46,13 +46,6 @@ voiced-booking-system/
 - **Date/Time**: date-fns
 - **Charts**: Recharts
 
-### **Why pnpm? (Modern Best Practices)**
-- **⚡ Performance**: 2x faster than npm, 1.5x faster than yarn
-- **💾 Space Efficiency**: Global content-addressable store prevents duplication
-- **🔒 Security**: Strict mode by default avoids phantom dependencies
-- **🎯 Monorepos**: Superior native workspace support
-- **📦 Compatibility**: 100% npm-compatible
-- **🚀 Installation**: Faster, deterministic installs
 
 ### **Backend - Django**
 - **Framework**: Django 5.0+
@@ -81,6 +74,7 @@ voiced-booking-system/
 - **Payments**: Stripe
 - **Email**: SendGrid
 - **SMS**: Twilio (optional)
+- **Internationalization**: Backend-Frontend i18n coordination
 
 ### **Real-time Data Flow (Vapi → Frontend)**
 - **WebSocket Connections**: Django Channels for live updates
@@ -88,6 +82,8 @@ voiced-booking-system/
 - **Vapi Webhooks**: Instant appointment creation notifications
 - **Frontend Updates**: Automatic calendar refresh without page reload
 - **Notification System**: Real-time alerts for new voice bookings
+- **Language Coordination**: Real-time language preference synchronization
+- **Multilingual Notifications**: Language-aware real-time messaging
 
 ## 📂 Detailed File Structure
 
@@ -164,19 +160,26 @@ frontend/
 │   │   ├── validations.ts           # Zod schemas
 │   │   ├── constants.ts
 │   │   ├── websocket.ts             # WebSocket client configuration
+│   │   ├── i18n.ts                  # i18n configuration
 │   │   └── types.ts
 │   ├── hooks/
 │   │   ├── use-api.ts
 │   │   ├── use-auth.ts
 │   │   ├── use-booking.ts
-│   │   └── use-real-time.ts         # WebSocket hook for real-time updates
+│   │   ├── use-translations.ts         # i18n hook
+│   │   ├── use-language.ts             # Language management hook
+│   │   └── use-real-time.ts           # WebSocket hook for real-time updates
 │   ├── stores/                      # Zustand stores
 │   │   ├── auth-store.ts
 │   │   ├── booking-store.ts
+│   │   ├── language-store.ts        # Language state management
 │   │   └── business-store.ts
 │   └── styles/
 │       └── globals.css
 ├── public/
+│   ├── locales/                     # Simple translation files
+│   │   ├── es.json                  # All Spanish translations
+│   │   └── en.json                  # All English translations
 │   ├── images/
 │   └── icons/
 ├── package.json
@@ -277,7 +280,16 @@ backend/
 ├── poetry.lock                      # Auto-generated lock file
 ├── static/
 ├── media/
-├── locale/                          # Internationalization
+├── locale/                          # Django translations
+│   ├── es/
+│   │   └── LC_MESSAGES/
+│   │       ├── django.po
+│   │       └── django.mo
+│   ├── en/
+│   │   └── LC_MESSAGES/
+│   │       ├── django.po
+│   │       └── django.mo
+│   └── LINGUAS
 ├── manage.py
 ├── pytest.ini
 ├── .env.example
@@ -286,7 +298,143 @@ backend/
 └── .dockerignore                    # Docker ignore file
 ```
 
-## 🚀 Initial Boilerplate Plan (Complete Setup)
+## 🌍 Internationalization (i18n) System Architecture
+
+### **Overview**
+VoiceAppoint implements a comprehensive internationalization system that coordinates between backend (Django) and frontend (Next.js) to provide a seamless multilingual experience. The system supports Spanish and English with the capability to easily add more languages.
+
+### **Architecture Components**
+
+#### **1. Backend Internationalization (Django)**
+
+**Translation Management:**
+- **Django i18n Framework**: Utilizing Django's built-in internationalization
+- **Translation Files**: `.po` and `.mo` files for each language
+- **Database Content**: Multilingual content stored in database models
+- **API Localization**: All API responses include localized content
+
+**Directory Structure:**
+```
+backend/
+├── locale/
+│   ├── es/LC_MESSAGES/          # Spanish translations
+│   ├── en/LC_MESSAGES/          # English translations
+│   └── LINGUAS                  # Supported languages
+├── apps/
+│   └── core/                    # Enhanced core app (no new app needed)
+│       ├── mixins.py            # Reusable translation mixin
+│       ├── middleware.py        # Language detection middleware  
+│       ├── utils.py             # Translation utilities
+│       └── management/commands/ # Translation management commands
+```
+
+**Database Schema - No Business Data Translation:**
+```
+Key Approach: Business data stays in native language (no translation fields needed)
+- tenants: locale (single field for system context)
+- services: name, description (business owner writes in their language)  
+- notification_templates: system messages only (Django i18n)
+- vapi_configurations: business content in native language, locale for context
+```
+
+**Backend Features:**
+- **Language Context Middleware**: Simple tenant locale detection (no complex routing)
+- **System Message Translation**: Only Django system messages (errors, notifications)
+- **Localized API Responses**: Headers and system messages, business data as-is
+- **Single Locale per Tenant**: Each business operates in one language naturally
+
+#### **2. Frontend Internationalization (Next.js)**
+
+**Next.js i18n Configuration:**
+- **Built-in i18n routing**: Native Next.js internationalization support
+- **Domain-based routing**: Optional language-specific domains
+- **Automatic locale detection**: Browser and user preference detection
+
+**Frontend Directory Structure:**
+```
+frontend/
+├── public/locales/             # Simple JSON for UI only
+│   ├── es.json                 # UI elements: buttons, navigation, messages  
+│   └── en.json                 # UI elements: buttons, navigation, messages
+├── src/lib/i18n.ts            # Minimal i18n setup (UI only)
+├── src/hooks/use-language.ts   # Single language hook for UI
+└── src/components/ui/language-switcher.tsx # For market-specific deployments
+```
+
+**Frontend Features:**
+- **Next.js Built-in i18n**: Using native Next.js internationalization (no extra libraries needed)
+- **Simple Language State**: Minimal Zustand store for language preference
+- **Coordinated API Calls**: Reusing existing API client with Accept-Language header
+- **Component Reusability**: Single language switcher component for entire app
+
+#### **3. API Coordination Layer**
+
+**Language State Management:**
+- **Simple Store**: Single Zustand store for current language only
+- **Backend Sync**: Language preference saved in existing user model (reusing `locale` field)
+- **Tenant Languages**: Stored in existing tenant model (no new entities)
+- **Minimal WebSocket Updates**: Reusing existing WebSocket infrastructure
+
+**Request/Response Flow:**
+- **Accept-Language Headers**: Automatic language detection from HTTP headers
+- **User Authentication**: Language preferences from user profile
+- **Tenant Context**: Business-specific language settings
+- **Fallback Strategy**: Graceful degradation when translations are missing
+
+#### **4. Vapi Integration with Multilingual Support**
+
+**Enhanced Vapi Configuration:**
+- **Single Assistant per Market**: One Vapi assistant per language market (es/en)
+- **Natural Language Context**: Business content remains in native language
+- **Locale-Aware Routing**: Simple tenant.locale parameter for system context
+- **No Content Translation**: Business writes naturally, system adapts context only
+
+**Multilingual Features:**
+- **Language Parameter**: Single `language` parameter in existing API calls (no new endpoints)
+- **Smart Fallback**: Default language when translation missing (simple logic)
+- **Reuse Existing Functions**: Same booking functions with language context
+- **Minimal Configuration**: Language settings in existing tenant configuration
+
+#### **5. Real-time Language Synchronization**
+
+**WebSocket Language Updates:**
+- **Reuse Existing Channels**: Add language events to current WebSocket implementation
+- **Minimal Payloads**: Only send language change events when needed
+- **Existing Infrastructure**: No new WebSocket connections or channels needed
+
+### **Implementation Roadmap**
+
+#### **Phase 1: Minimal Backend Setup (Week 1)**
+- Simple locale field in existing models (single VARCHAR column)
+- System message translation (Django i18n for errors/notifications only)
+- Business data remains in native language (no translation needed)
+- Basic Spanish/English system messages
+
+#### **Phase 2: Simple Frontend Integration (Week 2)**  
+- Configure Next.js i18n for UI elements only
+- Single language hook for interface translation
+- Business data displayed as-is (no translation)
+- Single JSON file per language market (UI only)
+
+#### **Phase 3: Vapi Context Integration (Week 3)**
+- Add locale context to existing Vapi functions (no new endpoints)
+- Business content remains in native language
+- Simple system context based on tenant.locale
+
+#### **Phase 4: Testing & Deployment (Week 4)**
+- Test existing functionality with locale context
+- Deploy to specific markets (Spain = Spanish, UK = English)
+- Basic documentation### **Key Features**
+
+✅ **Simple & Maintainable**: No new tables, reusing existing infrastructure (KISS)  
+✅ **DRY Implementation**: Single translation mixin, unified approach  
+✅ **YAGNI Compliance**: Only essential features, no over-engineering  
+✅ **Modular Design**: Reusable components across backend and frontend  
+✅ **Zero Breaking Changes**: Additive approach to existing codebase  
+✅ **Minimal Dependencies**: Using built-in framework features where possible  
+✅ **Easy Migration Path**: Can evolve to more complex system if needed
+
+---
 
 > **Goal**: Deliver a complete starter boilerplate so the team can start building immediately
 
@@ -860,6 +1008,10 @@ services:
       - DEBUG=1
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/voiceappoint
       - REDIS_URL=redis://redis:6379/0
+      - LANGUAGE_CODE=es
+      - LANGUAGES=es,en
+      - USE_I18N=True
+      - USE_L10N=True
 
   frontend:
     build: ./frontend
@@ -871,6 +1023,8 @@ services:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_DEFAULT_LOCALE=es
+      - NEXT_PUBLIC_SUPPORTED_LOCALES=es,en
 
   celery:
     build: ./backend
@@ -906,19 +1060,19 @@ volumes:
 ```mermaid
 sequenceDiagram
     participant User as 👤 Caller
-    participant Vapi as 🎙️ Vapi Agent
-    participant Backend as ⚙️ Django API
-    participant WS as 📡 WebSocket
-    participant Frontend as 💻 Dashboard
+    participant Vapi as 🎙️ Vapi Agent (Multilingual)
+    participant Backend as ⚙️ Django API (i18n)
+    participant WS as 📡 WebSocket (Language-aware)
+    participant Frontend as 💻 Dashboard (Localized)
 
-    User->>Vapi: "Book appointment for tomorrow 3pm"
-    Vapi->>Backend: POST /api/v1/vapi/book-appointment/
-    Backend->>Backend: Create appointment in DB
-    Backend->>WS: Broadcast appointment_created
-    WS->>Frontend: Real-time update
-    Frontend->>Frontend: Update calendar instantly
-    Backend-->>Vapi: Success response
-    Vapi-->>User: "Appointment confirmed!"
+    User->>Vapi: "Book appointment for tomorrow 3pm" (ES/EN)
+    Vapi->>Backend: POST /api/v1/vapi/book-appointment/ + language
+    Backend->>Backend: Create appointment in DB with locale
+    Backend->>WS: Broadcast appointment_created with language
+    WS->>Frontend: Real-time update (localized)
+    Frontend->>Frontend: Update calendar instantly in user's language
+    Backend-->>Vapi: Success response (localized)
+    Vapi-->>User: "Appointment confirmed!" (ES/EN)
 ```
 
 
@@ -1178,6 +1332,13 @@ SECRET_KEY=your-secret-key
 DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1
 
+# Internationalization
+LANGUAGE_CODE=es
+LANGUAGES=es,en
+USE_I18N=True
+USE_L10N=True
+TIME_ZONE=Europe/Madrid
+
 # Database
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/voiceappoint
 
@@ -1211,6 +1372,8 @@ SENTRY_DSN=your-sentry-dsn
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+NEXT_PUBLIC_DEFAULT_LOCALE=es
+NEXT_PUBLIC_SUPPORTED_LOCALES=es,en
 NEXTAUTH_SECRET=your-nextauth-secret
 NEXTAUTH_URL=http://localhost:3000
 ```
@@ -1241,6 +1404,12 @@ poetry run pytest
 poetry run black .
 poetry run isort .
 poetry run flake8
+# i18n commands
+poetry run python manage.py makemessages -l es
+poetry run python manage.py makemessages -l en
+poetry run python manage.py compilemessages
+poetry run python manage.py update_translations
+poetry run python manage.py export_translations
 poetry add django-extensions
 poetry add --group dev pytest-mock
 poetry update
