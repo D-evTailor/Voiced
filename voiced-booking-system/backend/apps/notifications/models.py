@@ -1,9 +1,9 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from apps.core.mixins import UUIDMixin, TimestampMixin, BaseModel
+from apps.core.mixins import SimpleModel
 
 
-class NotificationTemplate(UUIDMixin, TimestampMixin):
+class NotificationTemplate(SimpleModel):
     TEMPLATE_TYPES = [
         ('appointment_confirmed', _('Appointment Confirmed')),
         ('appointment_reminder', _('Appointment Reminder')),
@@ -22,19 +22,12 @@ class NotificationTemplate(UUIDMixin, TimestampMixin):
         ('webhook', _('Webhook')),
     ]
     
-    business = models.ForeignKey(
-        'businesses.Business',
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name='notification_templates'
-    )
+    business = models.ForeignKey('businesses.Business', on_delete=models.CASCADE, null=True, blank=True, related_name='notification_templates')
     name = models.CharField(_('template name'), max_length=100)
     type = models.CharField(_('type'), max_length=50, choices=TEMPLATE_TYPES)
     channel = models.CharField(_('channel'), max_length=20, choices=CHANNEL_TYPES)
     subject_template = models.TextField(_('subject template'), blank=True)
     body_template = models.TextField(_('body template'))
-    is_active = models.BooleanField(_('active'), default=True)
     is_system_default = models.BooleanField(_('system default'), default=False)
     
     class Meta:
@@ -52,7 +45,7 @@ class NotificationTemplate(UUIDMixin, TimestampMixin):
         return f"{business_name} - {self.name} ({self.channel})"
 
 
-class Notification(UUIDMixin, TimestampMixin):
+class Notification(SimpleModel):
     RECIPIENT_TYPES = [
         ('user', _('User')),
         ('client', _('Client')),
@@ -67,20 +60,8 @@ class Notification(UUIDMixin, TimestampMixin):
         ('cancelled', _('Cancelled')),
     ]
     
-    business = models.ForeignKey(
-        'businesses.Business',
-        on_delete=models.CASCADE,
-        related_name='notifications',
-        null=True,
-        blank=True
-    )
-    template = models.ForeignKey(
-        NotificationTemplate,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='notifications'
-    )
+    business = models.ForeignKey('businesses.Business', on_delete=models.CASCADE, related_name='notifications', null=True, blank=True)
+    template = models.ForeignKey(NotificationTemplate, on_delete=models.SET_NULL, null=True, blank=True, related_name='notifications')
     recipient_type = models.CharField(_('recipient type'), max_length=20, choices=RECIPIENT_TYPES)
     recipient_id = models.UUIDField(_('recipient ID'), null=True, blank=True)
     recipient_email = models.EmailField(_('recipient email'), blank=True)

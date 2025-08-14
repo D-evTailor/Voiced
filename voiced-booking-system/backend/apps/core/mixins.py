@@ -1,6 +1,8 @@
 from django.conf import settings
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 import uuid
 
 
@@ -19,7 +21,37 @@ class TimestampMixin(models.Model):
         abstract = True
 
 
-class AuditMixin(TimestampMixin):
+class VersionMixin(models.Model):
+    version = models.PositiveIntegerField(default=1)
+    
+    class Meta:
+        abstract = True
+    
+    def save(self, *args, **kwargs):
+        if self.pk:
+            self.version += 1
+        super().save(*args, **kwargs)
+
+
+class OrderMixin(models.Model):
+    order = models.PositiveIntegerField(
+        _('display order'),
+        default=0,
+        validators=[MinValueValidator(0)]
+    )
+    
+    class Meta:
+        abstract = True
+
+
+class ActiveMixin(models.Model):
+    is_active = models.BooleanField(_('active'), default=True)
+    
+    class Meta:
+        abstract = True
+
+
+class AuditMixin(TimestampMixin, VersionMixin):
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -65,7 +97,7 @@ class SoftDeleteManager(models.Manager):
 
 
 class SoftDeleteMixin(models.Model):
-    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
     deleted_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -99,6 +131,19 @@ class SoftDeleteMixin(models.Model):
         return self.deleted_at is not None
 
 
+class TenantQuerySet(models.QuerySet):
+    def for_business(self, business):
+        return self.filter(business=business)
+
+
+class TenantManager(models.Manager):
+    def get_queryset(self):
+        return TenantQuerySet(self.model, using=self._db)
+    
+    def for_business(self, business):
+        return self.get_queryset().for_business(business)
+
+
 class TenantMixin(models.Model):
     business = models.ForeignKey(
         'businesses.Business',
@@ -106,10 +151,22 @@ class TenantMixin(models.Model):
         related_name='%(class)s_set'
     )
     
+    objects = TenantManager()
+    
     class Meta:
         abstract = True
 
 
-class BaseModel(UUIDMixin, AuditMixin, SoftDeleteMixin, TenantMixin):
+class BaseModel(UUIDMixin, AuditMixin, SoftDeleteMixin, TenantMixin, ActiveMixin):
+    class Meta:
+        abstract = True
+
+
+class SimpleModel(UUIDMixin, TimestampMixin, ActiveMixin):
+    class Meta:
+        abstract = True
+
+
+class BusinessModel(UUIDMixin, TimestampMixin, VersionMixin, ActiveMixin):
     class Meta:
         abstract = True

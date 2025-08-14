@@ -1,32 +1,14 @@
 from django.db import models
-from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import EmailValidator
 from apps.core.mixins import BaseModel
 from apps.core.utils import generate_unique_reference, APPOINTMENT_STATUS_CHOICES, APPOINTMENT_SOURCE_CHOICES, PAYMENT_STATUS_CHOICES
-from decimal import Decimal
-import uuid
+
 
 class Appointment(BaseModel):
-    service = models.ForeignKey(
-        'services.Service',
-        on_delete=models.CASCADE,
-        related_name='appointments',
-        verbose_name=_('service')
-    )
-    client = models.ForeignKey(
-        'clients.Client',
-        on_delete=models.CASCADE,
-        related_name='appointments',
-        verbose_name=_('client'),
-        null=True,
-        blank=True
-    )
-    resources = models.ManyToManyField(
-        'resources.Resource',
-        through='resources.AppointmentResource',
-        related_name='appointments'
-    )
+    service = models.ForeignKey('services.Service', on_delete=models.CASCADE, related_name='appointments')
+    client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, related_name='appointments', null=True, blank=True)
+    resources = models.ManyToManyField('resources.Resource', through='resources.AppointmentResource', related_name='appointments')
     
     start_time = models.DateTimeField(_('start time'))
     end_time = models.DateTimeField(_('end time'))

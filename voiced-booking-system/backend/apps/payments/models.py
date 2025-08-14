@@ -1,28 +1,15 @@
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from apps.core.mixins import UUIDMixin, TimestampMixin, BaseModel
+from apps.core.mixins import SimpleModel, BaseModel
 from decimal import Decimal
-import uuid
 
 
-class SubscriptionPlan(UUIDMixin, TimestampMixin):
+class SubscriptionPlan(SimpleModel):
     name = models.CharField(_('plan name'), max_length=100)
     description = models.TextField(_('description'), blank=True)
-    price_monthly = models.DecimalField(
-        _('monthly price'),
-        max_digits=10,
-        decimal_places=2,
-        validators=[MinValueValidator(Decimal('0.00'))]
-    )
-    price_yearly = models.DecimalField(
-        _('yearly price'),
-        max_digits=10,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        validators=[MinValueValidator(Decimal('0.00'))]
-    )
+    price_monthly = models.DecimalField(_('monthly price'), max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.00'))])
+    price_yearly = models.DecimalField(_('yearly price'), max_digits=10, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(Decimal('0.00'))])
     currency = models.CharField(_('currency'), max_length=3, default='EUR')
     max_services = models.IntegerField(_('max services'), default=10)
     max_resources = models.IntegerField(_('max resources'), default=5)
@@ -31,7 +18,6 @@ class SubscriptionPlan(UUIDMixin, TimestampMixin):
     features = models.JSONField(_('features'), default=dict, blank=True)
     stripe_price_id_monthly = models.CharField(_('stripe monthly price ID'), max_length=100, blank=True)
     stripe_price_id_yearly = models.CharField(_('stripe yearly price ID'), max_length=100, blank=True)
-    is_active = models.BooleanField(_('active'), default=True)
     sort_order = models.PositiveIntegerField(_('sort order'), default=0)
     
     class Meta:
@@ -82,7 +68,7 @@ class Subscription(BaseModel):
         return f"{self.business.name} - {self.plan.name} ({self.status})"
 
 
-class Payment(UUIDMixin, TimestampMixin):
+class Payment(SimpleModel):
     STATUS_CHOICES = [
         ('pending', _('Pending')),
         ('succeeded', _('Succeeded')),
@@ -93,12 +79,7 @@ class Payment(UUIDMixin, TimestampMixin):
     
     subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE, related_name='payments')
     business = models.ForeignKey('businesses.Business', on_delete=models.CASCADE, related_name='payments')
-    amount = models.DecimalField(
-        _('amount'),
-        max_digits=10,
-        decimal_places=2,
-        validators=[MinValueValidator(Decimal('0.01'))]
-    )
+    amount = models.DecimalField(_('amount'), max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
     currency = models.CharField(_('currency'), max_length=3)
     status = models.CharField(_('status'), max_length=20, choices=STATUS_CHOICES, default='pending')
     stripe_payment_intent_id = models.CharField(_('stripe payment intent ID'), max_length=100, blank=True)

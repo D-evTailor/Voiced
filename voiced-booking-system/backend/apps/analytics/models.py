@@ -1,7 +1,7 @@
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from apps.core.mixins import UUIDMixin, TimestampMixin, BaseModel
+from apps.core.mixins import SimpleModel, BaseModel
 from decimal import Decimal
 
 
@@ -18,38 +18,12 @@ class BusinessMetrics(BaseModel):
     completed_appointments = models.PositiveIntegerField(_('completed appointments'), default=0)
     cancelled_appointments = models.PositiveIntegerField(_('cancelled appointments'), default=0)
     no_show_appointments = models.PositiveIntegerField(_('no show appointments'), default=0)
-    revenue_total = models.DecimalField(
-        _('total revenue'),
-        max_digits=10,
-        decimal_places=2,
-        default=Decimal('0.00'),
-        validators=[MinValueValidator(Decimal('0.00'))]
-    )
-    revenue_average_per_appointment = models.DecimalField(
-        _('average revenue per appointment'),
-        max_digits=10,
-        decimal_places=2,
-        default=Decimal('0.00'),
-        validators=[MinValueValidator(Decimal('0.00'))]
-    )
+    revenue_total = models.DecimalField(_('total revenue'), max_digits=10, decimal_places=2, default=Decimal('0.00'), validators=[MinValueValidator(Decimal('0.00'))])
+    revenue_average_per_appointment = models.DecimalField(_('average revenue per appointment'), max_digits=10, decimal_places=2, default=Decimal('0.00'), validators=[MinValueValidator(Decimal('0.00'))])
     new_clients = models.PositiveIntegerField(_('new clients'), default=0)
     returning_clients = models.PositiveIntegerField(_('returning clients'), default=0)
-    staff_utilization_percentage = models.DecimalField(
-        _('staff utilization percentage'),
-        max_digits=5,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        validators=[MinValueValidator(Decimal('0.00')), MaxValueValidator(Decimal('100.00'))]
-    )
-    room_utilization_percentage = models.DecimalField(
-        _('room utilization percentage'),
-        max_digits=5,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        validators=[MinValueValidator(Decimal('0.00')), MaxValueValidator(Decimal('100.00'))]
-    )
+    staff_utilization_percentage = models.DecimalField(_('staff utilization percentage'), max_digits=5, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(Decimal('0.00')), MaxValueValidator(Decimal('100.00'))])
+    room_utilization_percentage = models.DecimalField(_('room utilization percentage'), max_digits=5, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(Decimal('0.00')), MaxValueValidator(Decimal('100.00'))])
     custom_metrics = models.JSONField(_('custom metrics'), default=dict, blank=True)
     
     class Meta:
@@ -66,7 +40,7 @@ class BusinessMetrics(BaseModel):
         return f"{self.business.name} - {self.metric_date} ({self.metric_type})"
 
 
-class AuditLog(UUIDMixin, TimestampMixin):
+class AuditLog(SimpleModel):
     ACTION_CHOICES = [
         ('CREATE', _('Create')),
         ('UPDATE', _('Update')),
@@ -77,23 +51,11 @@ class AuditLog(UUIDMixin, TimestampMixin):
         ('IMPORT', _('Import')),
     ]
     
-    business = models.ForeignKey(
-        'businesses.Business',
-        on_delete=models.CASCADE,
-        related_name='audit_logs',
-        null=True,
-        blank=True
-    )
+    business = models.ForeignKey('businesses.Business', on_delete=models.CASCADE, related_name='audit_logs', null=True, blank=True)
     action = models.CharField(_('action'), max_length=20, choices=ACTION_CHOICES)
     table_name = models.CharField(_('table name'), max_length=100)
     record_id = models.UUIDField(_('record ID'), null=True, blank=True)
-    user = models.ForeignKey(
-        'users.User',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='audit_logs'
-    )
+    user = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='audit_logs')
     user_email = models.EmailField(_('user email'), blank=True)
     ip_address = models.GenericIPAddressField(_('IP address'), null=True, blank=True)
     user_agent = models.TextField(_('user agent'), blank=True)

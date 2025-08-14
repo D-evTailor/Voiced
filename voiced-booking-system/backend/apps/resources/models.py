@@ -1,7 +1,7 @@
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from apps.core.mixins import BaseModel
+from apps.core.mixins import BaseModel, TimestampMixin
 from apps.core.managers import TenantManager
 from apps.core.utils import RESOURCE_TYPE_CHOICES
 
@@ -10,17 +10,10 @@ class Resource(BaseModel):
     name = models.CharField(_('name'), max_length=100)
     type = models.CharField(_('type'), max_length=20, choices=RESOURCE_TYPE_CHOICES)
     description = models.TextField(_('description'), blank=True)
-    user = models.OneToOneField(
-        'users.User',
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name='resource'
-    )
+    user = models.OneToOneField('users.User', on_delete=models.CASCADE, null=True, blank=True, related_name='resource')
     capacity = models.PositiveIntegerField(_('capacity'), default=1)
     location = models.CharField(_('location'), max_length=100, blank=True)
     color = models.CharField(_('color'), max_length=7, default='#6B7280')
-    is_active = models.BooleanField(_('active'), default=True)
     
     objects = TenantManager()
     
@@ -49,17 +42,12 @@ class ResourceSchedule(BaseModel):
         (6, _('Sunday')),
     ]
     
-    resource = models.ForeignKey(
-        Resource,
-        on_delete=models.CASCADE,
-        related_name='schedules'
-    )
+    resource = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name='schedules')
     day_of_week = models.IntegerField(_('day of week'), choices=DAYS_OF_WEEK)
     start_time = models.TimeField(_('start time'))
     end_time = models.TimeField(_('end time'))
     effective_from = models.DateField(_('effective from'), auto_now_add=True)
     effective_until = models.DateField(_('effective until'), null=True, blank=True)
-    is_active = models.BooleanField(_('active'), default=True)
     
     class Meta:
         verbose_name = _('Resource Schedule')
@@ -86,11 +74,7 @@ class ResourceBlock(BaseModel):
         ('other', _('Other')),
     ]
     
-    resource = models.ForeignKey(
-        Resource,
-        on_delete=models.CASCADE,
-        related_name='blocks'
-    )
+    resource = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name='blocks')
     start_datetime = models.DateTimeField(_('start datetime'))
     end_datetime = models.DateTimeField(_('end datetime'))
     block_type = models.CharField(_('block type'), max_length=20, choices=BLOCK_TYPES)
@@ -112,21 +96,9 @@ class ResourceBlock(BaseModel):
 
 
 class ServiceResource(models.Model):
-    service = models.ForeignKey(
-        'services.Service',
-        on_delete=models.CASCADE,
-        related_name='service_resources'
-    )
-    resource = models.ForeignKey(
-        Resource,
-        on_delete=models.CASCADE,
-        related_name='service_resources'
-    )
-    quantity_required = models.PositiveIntegerField(
-        _('quantity required'),
-        default=1,
-        validators=[MinValueValidator(1)]
-    )
+    service = models.ForeignKey('services.Service', on_delete=models.CASCADE, related_name='service_resources')
+    resource = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name='service_resources')
+    quantity_required = models.PositiveIntegerField(_('quantity required'), default=1, validators=[MinValueValidator(1)])
     is_required = models.BooleanField(_('required'), default=True)
     preference_order = models.PositiveIntegerField(_('preference order'), default=0)
     
@@ -144,20 +116,11 @@ class ServiceResource(models.Model):
         return f"{self.service.name} -> {self.resource.name} (x{self.quantity_required})"
 
 
-class AppointmentResource(models.Model):
-    appointment = models.ForeignKey(
-        'appointments.Appointment',
-        on_delete=models.CASCADE,
-        related_name='appointment_resources'
-    )
-    resource = models.ForeignKey(
-        Resource,
-        on_delete=models.CASCADE,
-        related_name='appointment_resources'
-    )
+class AppointmentResource(TimestampMixin):
+    appointment = models.ForeignKey('appointments.Appointment', on_delete=models.CASCADE, related_name='appointment_resources')
+    resource = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name='appointment_resources')
     allocated_start = models.DateTimeField(_('allocated start'))
     allocated_end = models.DateTimeField(_('allocated end'))
-    created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
         verbose_name = _('Appointment Resource')

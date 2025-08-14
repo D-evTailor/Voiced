@@ -3,7 +3,6 @@ from django.utils.translation import gettext_lazy as _
 from apps.core.mixins import BaseModel
 from apps.core.managers import TenantManager
 from apps.core.utils import PHONE_REGEX_VALIDATOR, LANGUAGE_CHOICES
-from decimal import Decimal
 
 
 class Client(BaseModel):
@@ -11,17 +10,9 @@ class Client(BaseModel):
     last_name = models.CharField(_('last name'), max_length=100, blank=True)
     email = models.EmailField(_('email'), blank=True)
     phone = models.CharField(_('phone number'), validators=[PHONE_REGEX_VALIDATOR], max_length=17, blank=True)
-    
     date_of_birth = models.DateField(_('date of birth'), null=True, blank=True)
-    preferred_language = models.CharField(
-        _('preferred language'),
-        max_length=10,
-        choices=LANGUAGE_CHOICES,
-        default='es'
-    )
-    
+    preferred_language = models.CharField(_('preferred language'), max_length=10, choices=LANGUAGE_CHOICES, default='es')
     notes = models.TextField(_('notes'), blank=True)
-    is_active = models.BooleanField(_('active'), default=True)
     
     objects = TenantManager()
     

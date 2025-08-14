@@ -1,7 +1,7 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from apps.core.mixins import BaseModel, UUIDMixin, TimestampMixin
-from apps.core.utils import get_vapi_context_for_business_type
+from apps.core.mixins import BaseModel, SimpleModel
+from apps.core.utils import get_vapi_context_for_business_type, LANGUAGE_CHOICES
 
 
 class VapiConfiguration(BaseModel):
@@ -9,18 +9,9 @@ class VapiConfiguration(BaseModel):
     assistant_id = models.CharField(_('Vapi assistant ID'), max_length=255)
     assistant_name = models.CharField(_('assistant name'), max_length=100, default='Booking Assistant')
     assistant_greeting = models.TextField(_('assistant greeting'), blank=True)
-    language = models.CharField(
-        _('language'),
-        max_length=10,
-        choices=[
-            ('es', _('Spanish')),
-            ('en', _('English')),
-        ],
-        default='es'
-    )
+    language = models.CharField(_('language'), max_length=10, choices=LANGUAGE_CHOICES, default='es')
     business_context = models.TextField(_('business context'), blank=True)
     settings = models.JSONField(_('settings'), default=dict, blank=True)
-    is_active = models.BooleanField(_('active'), default=True)
     
     class Meta:
         verbose_name = _('Vapi Configuration')
@@ -37,7 +28,7 @@ class VapiConfiguration(BaseModel):
         return get_vapi_context_for_business_type(self.business.business_type)
 
 
-class VapiCallLog(UUIDMixin, TimestampMixin):
+class VapiCallLog(SimpleModel):
     CALL_STATUS_CHOICES = [
         ('initiated', _('Initiated')),
         ('in_progress', _('In Progress')),
@@ -55,13 +46,7 @@ class VapiCallLog(UUIDMixin, TimestampMixin):
     summary = models.TextField(_('summary'), blank=True)
     intent_detected = models.CharField(_('intent detected'), max_length=100, blank=True)
     entities_extracted = models.JSONField(_('entities extracted'), default=dict, blank=True)
-    appointment = models.ForeignKey(
-        'appointments.Appointment',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='vapi_call_logs'
-    )
+    appointment = models.ForeignKey('appointments.Appointment', on_delete=models.SET_NULL, null=True, blank=True, related_name='vapi_call_logs')
     booking_successful = models.BooleanField(_('booking successful'), default=False)
     booking_error = models.TextField(_('booking error'), blank=True)
     call_started_at = models.DateTimeField(_('call started at'), null=True, blank=True)

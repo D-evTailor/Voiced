@@ -4,7 +4,8 @@ from django.core.validators import EmailValidator
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from apps.core.mixins import TimestampMixin, UUIDMixin
+from apps.core.mixins import TimestampMixin, SimpleModel
+from apps.core.utils import LANGUAGE_CHOICES
 
 
 class UserManager(BaseUserManager):
@@ -29,66 +30,18 @@ class UserManager(BaseUserManager):
 
 
 class User(AbstractBaseUser, PermissionsMixin):
-    email = models.EmailField(
-        _('email address'),
-        unique=True,
-        validators=[EmailValidator()],
-        help_text=_('Required. Enter a valid email address.')
-    )
-    first_name = models.CharField(
-        _('first name'),
-        max_length=150,
-        blank=True
-    )
-    last_name = models.CharField(
-        _('last name'),
-        max_length=150,
-        blank=True
-    )
-    is_active = models.BooleanField(
-        _('active'),
-        default=True,
-        help_text=_('Designates whether this user should be treated as active.')
-    )
-    is_staff = models.BooleanField(
-        _('staff status'),
-        default=False,
-        help_text=_('Designates whether the user can log into this admin site.')
-    )
-    is_verified = models.BooleanField(
-        _('verified'),
-        default=False,
-        help_text=_('Designates whether the user has verified their email address.')
-    )
-    locale = models.CharField(
-        _('locale'),
-        max_length=10,
-        choices=[
-            ('es', _('Spanish')),
-            ('en', _('English')),
-        ],
-        default='es',
-        help_text=_('User preferred language for interface and notifications.')
-    )
-    timezone = models.CharField(
-        _('timezone'),
-        max_length=50,
-        default='Europe/Madrid',
-        help_text=_('User timezone for appointment scheduling.')
-    )
-    date_joined = models.DateTimeField(
-        _('date joined'),
-        default=timezone.now
-    )
-    last_login = models.DateTimeField(
-        _('last login'),
-        blank=True,
-        null=True
-    )
-    updated_at = models.DateTimeField(
-        _('updated at'),
-        auto_now=True
-    )
+    email = models.EmailField(_('email address'), unique=True, validators=[EmailValidator()])
+    first_name = models.CharField(_('first name'), max_length=150, blank=True)
+    last_name = models.CharField(_('last name'), max_length=150, blank=True)
+    is_active = models.BooleanField(_('active'), default=True)
+    is_staff = models.BooleanField(_('staff status'), default=False)
+    is_verified = models.BooleanField(_('verified'), default=False)
+    locale = models.CharField(_('locale'), max_length=10, choices=LANGUAGE_CHOICES, default='es')
+    timezone = models.CharField(_('timezone'), max_length=50, default='Europe/Madrid')
+    date_joined = models.DateTimeField(_('date joined'), default=timezone.now)
+    last_login = models.DateTimeField(_('last login'), blank=True, null=True)
+    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
+    
     objects = UserManager()
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
@@ -120,40 +73,12 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 
 class UserProfile(TimestampMixin):
-    user = models.OneToOneField(
-        User,
-        on_delete=models.CASCADE,
-        related_name='profile',
-        verbose_name=_('user')
-    )
-    phone = models.CharField(
-        _('phone number'),
-        max_length=20,
-        blank=True,
-        help_text=_('Phone number for SMS notifications.')
-    )
-    avatar = models.ImageField(
-        _('avatar'),
-        upload_to='avatars/',
-        blank=True,
-        null=True,
-        help_text=_('Profile picture.')
-    )
-    email_notifications = models.BooleanField(
-        _('email notifications'),
-        default=True,
-        help_text=_('Receive notifications via email.')
-    )
-    sms_notifications = models.BooleanField(
-        _('SMS notifications'),
-        default=False,
-        help_text=_('Receive notifications via SMS.')
-    )
-    marketing_emails = models.BooleanField(
-        _('marketing emails'),
-        default=False,
-        help_text=_('Receive marketing and promotional emails.')
-    )
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    phone = models.CharField(_('phone number'), max_length=20, blank=True)
+    avatar = models.ImageField(_('avatar'), upload_to='avatars/', blank=True, null=True)
+    email_notifications = models.BooleanField(_('email notifications'), default=True)
+    sms_notifications = models.BooleanField(_('SMS notifications'), default=False)
+    marketing_emails = models.BooleanField(_('marketing emails'), default=False)
 
     class Meta:
         verbose_name = _('User Profile')
@@ -164,19 +89,9 @@ class UserProfile(TimestampMixin):
         return f'{self.user.email} Profile'
 
 
-class UserSession(UUIDMixin, TimestampMixin):
-    user = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name='sessions',
-        verbose_name=_('user')
-    )
-    token_jti = models.CharField(
-        _('JWT ID'),
-        max_length=255,
-        unique=True,
-        db_index=True
-    )
+class UserSession(SimpleModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sessions')
+    token_jti = models.CharField(_('JWT ID'), max_length=255, unique=True, db_index=True)
     device_info = models.JSONField(_('device information'), default=dict, blank=True)
     ip_address = models.GenericIPAddressField(_('IP address'))
     user_agent = models.TextField(_('user agent'), blank=True)
@@ -201,7 +116,6 @@ class UserSession(UUIDMixin, TimestampMixin):
     
     @property
     def is_expired(self):
-        from django.utils import timezone
         return self.expires_at < timezone.now()
     
     @property
@@ -209,12 +123,11 @@ class UserSession(UUIDMixin, TimestampMixin):
         return not self.is_expired and not self.revoked_at
     
     def revoke(self):
-        from django.utils import timezone
         self.revoked_at = timezone.now()
         self.save()
 
 
-class LoginAttempt(UUIDMixin, TimestampMixin):
+class LoginAttempt(SimpleModel):
     FAILURE_REASONS = [
         ('invalid_credentials', _('Invalid credentials')),
         ('account_disabled', _('Account disabled')),
@@ -251,9 +164,7 @@ class LoginAttempt(UUIDMixin, TimestampMixin):
     
     @classmethod
     def get_recent_failures_for_email(cls, email, minutes=15):
-        from django.utils import timezone
         from datetime import timedelta
-        
         cutoff = timezone.now() - timedelta(minutes=minutes)
         return cls.objects.filter(
             email=email,
@@ -263,9 +174,7 @@ class LoginAttempt(UUIDMixin, TimestampMixin):
     
     @classmethod
     def get_recent_failures_for_ip(cls, ip_address, minutes=15):
-        from django.utils import timezone
         from datetime import timedelta
-        
         cutoff = timezone.now() - timedelta(minutes=minutes)
         return cls.objects.filter(
             ip_address=ip_address,
