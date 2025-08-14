@@ -1,2 +1,5 @@
 .DS_Store
 voiced-booking-system/backend/apps/vapi_integration/README.md
+.vscode/mcp.json
+.gitignore
+.vscode/settings.json

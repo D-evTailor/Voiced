@@ -1,5 +1,8 @@
 from rest_framework import serializers
 from .models import VapiConfiguration, VapiCall, VapiCallTranscript, VapiCallAnalysis, VapiAppointmentIntegration
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class VapiConfigurationSerializer(serializers.ModelSerializer):
@@ -66,23 +69,39 @@ class VapiWebhookSerializer(serializers.Serializer):
         call_data = validated_data['call']
         business = self.context['business']
         
-        call, created = VapiCall.objects.get_or_create(
-            call_id=call_data['id'],
-            defaults={
-                'business': business,
-                'org_id': call_data.get('orgId', ''),
-                'type': call_data.get('type', ''),
-                'status': call_data.get('status', ''),
-                'ended_reason': call_data.get('endedReason', ''),
-                'started_at': call_data.get('startedAt'),
-                'ended_at': call_data.get('endedAt'),
-                'cost': call_data.get('cost'),
-                'cost_breakdown': call_data.get('costBreakdown', {}),
-                'phone_number': call_data.get('phoneNumber', ''),
-                'customer_number': call_data.get('customer', {}).get('number', ''),
-            }
-        )
-        
+        try:
+            call, created = VapiCall.objects.get_or_create(
+                call_id=call_data['id'],
+                defaults={
+                    'business': business,
+                    'org_id': call_data.get('orgId', ''),
+                    'type': call_data.get('type', ''),
+                    'status': call_data.get('status', ''),
+                    'ended_reason': call_data.get('endedReason', ''),
+                    'started_at': call_data.get('startedAt'),
+                    'ended_at': call_data.get('endedAt'),
+                    'cost': call_data.get('cost'),
+                    'cost_breakdown': call_data.get('costBreakdown', {}),
+                    'phone_number': call_data.get('phoneNumber', ''),
+                    'customer_number': call_data.get('customer', {}).get('number', ''),
+                }
+            )
+            
+            self._update_transcript(call, call_data)
+            self._update_analysis(call, call_data)
+            
+            if created:
+                logger.info(f"Created new call: {call.call_id}")
+            else:
+                logger.info(f"Updated existing call: {call.call_id}")
+            
+            return call
+            
+        except Exception as e:
+            logger.error(f"Error creating/updating call {call_data.get('id')}: {e}")
+            raise serializers.ValidationError(f"Error processing call data: {str(e)}")
+    
+    def _update_transcript(self, call, call_data):
         if call_data.get('transcript'):
             VapiCallTranscript.objects.update_or_create(
                 call=call,
@@ -91,7 +110,8 @@ class VapiWebhookSerializer(serializers.Serializer):
                     'messages': call_data.get('messages', []),
                 }
             )
-        
+    
+    def _update_analysis(self, call, call_data):
         if call_data.get('analysis'):
             analysis_data = call_data['analysis']
             VapiCallAnalysis.objects.update_or_create(
@@ -102,5 +122,3 @@ class VapiWebhookSerializer(serializers.Serializer):
                     'success_evaluation': analysis_data.get('successEvaluation', ''),
                 }
             )
-        
-        return call

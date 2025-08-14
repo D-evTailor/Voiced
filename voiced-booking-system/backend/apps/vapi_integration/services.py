@@ -4,6 +4,9 @@ from datetime import datetime, timedelta
 from apps.services.models import Service
 from apps.resources.models import Resource
 from apps.appointments.models import Appointment
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class VapiBookingService:
@@ -91,6 +94,7 @@ class VapiBookingService:
                     status='confirmed'
                 )
                 
+                logger.info(f"Appointment created: {appointment.id} for business {self.business.id}")
                 return {
                     'success': True,
                     'appointment_id': appointment.id,
@@ -98,14 +102,17 @@ class VapiBookingService:
                     'message': f'Appointment booked for {start_time.strftime("%Y-%m-%d at %H:%M")}'
                 }
             else:
+                logger.warning(f"Time slot not available for service {service.id} at {start_time}")
                 return {
                     'success': False,
                     'error': 'Time slot not available'
                 }
                 
         except Service.DoesNotExist:
+            logger.error(f"Service not found: {appointment_data.get('service_id')}")
             return {'success': False, 'error': 'Service not found'}
         except Exception as e:
+            logger.error(f"Error creating appointment: {e}")
             return {'success': False, 'error': str(e)}
     
     def _is_slot_available(self, service: Service, start_time: datetime, duration_minutes: int) -> bool:
@@ -172,43 +179,13 @@ class VapiIntegrationService:
         self.business = business
         self.booking_service = VapiBookingService(business)
     
-    def process_webhook_data(self, webhook_data: Dict) -> Dict:
-        event = webhook_data.get('event')
-        call_data = webhook_data.get('call', {})
-        
-        if event == 'call.ended':
-            return self._process_call_ended(call_data)
-        elif event == 'call.started':
-            return self._process_call_started(call_data)
-        
-        return {'status': 'processed', 'action': 'none'}
-    
-    def _process_call_ended(self, call_data: Dict) -> Dict:
-        if call_data.get('analysis', {}).get('structuredData'):
-            structured_data = call_data['analysis']['structuredData']
-            analyzer = VapiCallAnalyzer(None)
-            appointment_data = analyzer.extract_appointment_data(structured_data)
-            
-            if appointment_data:
-                result = self._attempt_booking(appointment_data)
-                return {'status': 'processed', 'booking_result': result}
-        
-        return {'status': 'processed', 'action': 'no_booking_data'}
-    
-    def _process_call_started(self, call_data: Dict) -> Dict:
-        return {'status': 'processed', 'action': 'call_started'}
-    
-    def _attempt_booking(self, appointment_data: Dict) -> Dict:
+    def attempt_booking(self, appointment_data: Dict) -> Dict:
         try:
             services = self.booking_service.get_available_services()
-            matching_service = None
-            
-            for service in services:
-                if appointment_data.get('service_name', '').lower() in service['name'].lower():
-                    matching_service = service
-                    break
+            matching_service = self._find_matching_service(services, appointment_data)
             
             if not matching_service:
+                logger.warning(f"Service not found for: {appointment_data.get('service_name')}")
                 return {'success': False, 'error': 'Service not found'}
             
             booking_data = {
@@ -219,7 +196,17 @@ class VapiIntegrationService:
                 'customer_email': appointment_data.get('client_email', ''),
             }
             
-            return self.booking_service.create_appointment(booking_data)
+            result = self.booking_service.create_appointment(booking_data)
+            logger.info(f"Booking attempt result for business {self.business.id}: {result}")
+            return result
             
         except Exception as e:
+            logger.error(f"Booking failed for business {self.business.id}: {e}")
             return {'success': False, 'error': f'Booking failed: {str(e)}'}
+    
+    def _find_matching_service(self, services: List[Dict], appointment_data: Dict) -> Optional[Dict]:
+        service_name = appointment_data.get('service_name', '').lower()
+        for service in services:
+            if service_name in service['name'].lower():
+                return service
+        return None
