@@ -2,6 +2,7 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from apps.core.mixins import BaseModel
+from apps.core.managers import TenantManager
 
 
 class Resource(BaseModel):
@@ -25,6 +26,8 @@ class Resource(BaseModel):
     location = models.CharField(_('location'), max_length=100, blank=True)
     color = models.CharField(_('color'), max_length=7, default='#6B7280')
     is_active = models.BooleanField(_('active'), default=True)
+    
+    objects = TenantManager()
     
     class Meta:
         verbose_name = _('Resource')

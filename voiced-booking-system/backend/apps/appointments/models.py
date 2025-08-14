@@ -33,6 +33,21 @@ class Appointment(BaseModel):
     source = models.CharField(_('booking source'), max_length=20, choices=SOURCE_CHOICES, default='online')
     notes = models.TextField(_('notes'), blank=True)
     internal_notes = models.TextField(_('internal notes'), blank=True)
+    quoted_price = models.DecimalField(_('quoted price'), max_digits=10, decimal_places=2, null=True, blank=True)
+    final_price = models.DecimalField(_('final price'), max_digits=10, decimal_places=2, null=True, blank=True)
+    paid_amount = models.DecimalField(_('paid amount'), max_digits=10, decimal_places=2, default=0)
+    payment_status = models.CharField(
+        _('payment status'),
+        max_length=20,
+        choices=[
+            ('pending', _('Pending')),
+            ('paid', _('Paid')),
+            ('partially_paid', _('Partially Paid')),
+            ('refunded', _('Refunded')),
+            ('failed', _('Failed')),
+        ],
+        default='pending'
+    )
     
     class Meta:
         verbose_name = _('Appointment')

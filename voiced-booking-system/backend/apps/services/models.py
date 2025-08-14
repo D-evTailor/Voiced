@@ -3,6 +3,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from decimal import Decimal
 from apps.core.mixins import BaseModel, TimestampMixin
+from apps.core.managers import TenantManager
 import uuid
 
 class ServiceCategory(BaseModel):
@@ -130,6 +131,8 @@ class Service(BaseModel):
         null=True,
         help_text=_('Optional image for the service')
     )
+    
+    objects = TenantManager()
     class Meta:
         verbose_name = _('Service')
         verbose_name_plural = _('Services')
