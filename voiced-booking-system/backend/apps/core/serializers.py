@@ -5,6 +5,32 @@ from .mixins import BaseModel
 User = get_user_model()
 
 
+class CountSerializerMixin:
+    def get_active_count(self, obj, relation_name):
+        return getattr(obj, relation_name).filter(is_active=True).count()
+
+
+class UserFieldsMixin:
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+
+
+class DisplayFieldsMixin:
+    @property
+    def display_fields(self):
+        return {
+            'status_display': serializers.CharField(source='get_status_display', read_only=True),
+            'type_display': serializers.CharField(source='get_type_display', read_only=True),
+            'role_display': serializers.CharField(source='get_role_display', read_only=True),
+        }
+
+
+class TimeFieldsMixin:
+    end_time = serializers.ReadOnlyField()
+    duration_display = serializers.ReadOnlyField()
+    total_time_required = serializers.ReadOnlyField()
+
+
 class BaseSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField(read_only=True)
     updated_by = serializers.StringRelatedField(read_only=True)

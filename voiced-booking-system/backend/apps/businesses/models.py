@@ -1,11 +1,11 @@
 from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from apps.core.mixins import BusinessModel, TimestampMixin
+from apps.core.mixins import BusinessModel, TimestampMixin, CountMixin
 from apps.core.utils import PHONE_REGEX_VALIDATOR, LANGUAGE_CHOICES, CURRENCY_CHOICES, BUSINESS_TYPE_CHOICES
 
 
-class Business(BusinessModel):
+class Business(BusinessModel, CountMixin):
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -44,6 +44,7 @@ class Business(BusinessModel):
         default='trial'
     )
     trial_ends_at = models.DateTimeField(_('trial ends at'), null=True, blank=True)
+    _count_relation = 'members'
     
     class Meta:
         verbose_name = _('Business')

@@ -2,7 +2,7 @@ from rest_framework import permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from apps.core.viewsets import BaseViewSet, TenantViewSet
+from apps.core.viewsets import BaseViewSet, TenantViewSet, OptimizedViewSetMixin
 from apps.core.permissions import BusinessOwnerPermission, BusinessManagerPermission
 from apps.core.exceptions import success_response, error_response
 from .models import Business, BusinessHours, BusinessMember
@@ -12,11 +12,13 @@ from .serializers import (
 )
 
 
-class BusinessViewSet(BaseViewSet):
+class BusinessViewSet(OptimizedViewSetMixin, BaseViewSet):
     serializer_class = BusinessSerializer
     permission_classes = [permissions.IsAuthenticated]
     search_fields = ['name', 'email', 'city']
     filterset_fields = ['is_active', 'locale', 'currency', 'subscription_status']
+    select_related_fields = ['owner']
+    prefetch_related_fields = ['business_hours', 'members__user']
     
     def get_queryset(self):
         return Business.objects.filter(

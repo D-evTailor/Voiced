@@ -67,3 +67,16 @@ class ReadOnlyTenantViewSet(viewsets.ReadOnlyModelViewSet):
     
     def get_queryset(self):
         return self.queryset.filter(business=self.request.business)
+
+
+class OptimizedViewSetMixin:
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return self.optimize_queryset(queryset)
+    
+    def optimize_queryset(self, queryset):
+        if hasattr(self, 'select_related_fields'):
+            queryset = queryset.select_related(*self.select_related_fields)
+        if hasattr(self, 'prefetch_related_fields'):
+            queryset = queryset.prefetch_related(*self.prefetch_related_fields)
+        return queryset

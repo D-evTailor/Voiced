@@ -2,13 +2,14 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from decimal import Decimal
-from apps.core.mixins import BaseModel, TimestampMixin, OrderMixin
+from apps.core.mixins import BaseModel, TimestampMixin, OrderMixin, CountMixin, TimeCalculationMixin
 from apps.core.managers import TenantManager
 
 
-class ServiceCategory(BaseModel, OrderMixin):
+class ServiceCategory(BaseModel, OrderMixin, CountMixin):
     name = models.CharField(_('category name'), max_length=100)
     description = models.TextField(_('description'), blank=True)
+    _count_relation = 'services'
     
     class Meta:
         verbose_name = _('Service Category')
@@ -21,7 +22,7 @@ class ServiceCategory(BaseModel, OrderMixin):
         return f"{self.business.name} - {self.name}"
 
 
-class Service(BaseModel, OrderMixin):
+class Service(BaseModel, OrderMixin, TimeCalculationMixin, CountMixin):
     category = models.ForeignKey(ServiceCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='services')
     name = models.CharField(_('service name'), max_length=200)
     description = models.TextField(_('description'), blank=True)
@@ -32,6 +33,7 @@ class Service(BaseModel, OrderMixin):
     online_booking_enabled = models.BooleanField(_('online booking enabled'), default=True)
     voice_booking_enabled = models.BooleanField(_('voice booking enabled'), default=True)
     resources = models.ManyToManyField('resources.Resource', through='resources.ServiceResource', related_name='services')
+    _count_relation = 'providers'
     
     objects = TenantManager()
     

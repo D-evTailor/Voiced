@@ -1,9 +1,9 @@
 from rest_framework import serializers
-from apps.core.serializers import TenantFilteredSerializer
+from apps.core.serializers import TenantFilteredSerializer, CountSerializerMixin, TimeFieldsMixin
 from .models import Service, ServiceCategory, ServiceProvider
 
 
-class ServiceCategorySerializer(TenantFilteredSerializer):
+class ServiceCategorySerializer(TenantFilteredSerializer, CountSerializerMixin):
     services_count = serializers.SerializerMethodField()
     
     class Meta:
@@ -11,7 +11,7 @@ class ServiceCategorySerializer(TenantFilteredSerializer):
         fields = '__all__'
     
     def get_services_count(self, obj):
-        return obj.services.filter(is_active=True).count()
+        return self.get_active_count(obj, 'services')
 
 
 class ServiceProviderSerializer(serializers.ModelSerializer):
@@ -23,10 +23,8 @@ class ServiceProviderSerializer(serializers.ModelSerializer):
         fields = ['id', 'user', 'user_name', 'user_email', 'is_primary', 'is_active']
 
 
-class ServiceSerializer(TenantFilteredSerializer):
+class ServiceSerializer(TenantFilteredSerializer, TimeFieldsMixin, CountSerializerMixin):
     category_name = serializers.CharField(source='category.name', read_only=True)
-    duration_display = serializers.CharField(read_only=True)
-    total_time_required = serializers.IntegerField(read_only=True)
     providers = ServiceProviderSerializer(many=True, read_only=True)
     providers_count = serializers.SerializerMethodField()
     
@@ -35,7 +33,7 @@ class ServiceSerializer(TenantFilteredSerializer):
         fields = '__all__'
     
     def get_providers_count(self, obj):
-        return obj.providers.filter(is_active=True).count()
+        return self.get_active_count(obj, 'providers')
 
 
 class ServiceCreateSerializer(TenantFilteredSerializer):
@@ -79,9 +77,9 @@ class ServiceUpdateSerializer(TenantFilteredSerializer):
         read_only_fields = ['business']
 
 
-class ServiceListSerializer(serializers.ModelSerializer):
+class ServiceListSerializer(serializers.ModelSerializer, CountSerializerMixin):
     category_name = serializers.CharField(source='category.name', read_only=True)
-    duration_display = serializers.CharField(read_only=True)
+    duration_display = serializers.ReadOnlyField()
     providers_count = serializers.SerializerMethodField()
     
     class Meta:
@@ -91,4 +89,4 @@ class ServiceListSerializer(serializers.ModelSerializer):
                  'providers_count', 'color']
     
     def get_providers_count(self, obj):
-        return obj.providers.filter(is_active=True).count()
+        return self.get_active_count(obj, 'providers')

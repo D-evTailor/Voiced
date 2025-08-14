@@ -3,7 +3,27 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 
-class TenantQuerySet(models.QuerySet):
+class OptimizedQuerySetMixin:
+    def optimized_for_list(self):
+        if hasattr(self.model, '_select_related_fields'):
+            self = self.select_related(*self.model._select_related_fields)
+        if hasattr(self.model, '_prefetch_related_fields'):
+            self = self.prefetch_related(*self.model._prefetch_related_fields)
+        return self
+    
+    def with_business_data(self):
+        return self.select_related('business')
+    
+    def with_user_data(self):
+        return self.select_related('user')
+    
+    def with_counts(self, *relations):
+        for relation in relations:
+            self = self.prefetch_related(f'{relation}__active')
+        return self
+
+
+class TenantQuerySet(OptimizedQuerySetMixin, models.QuerySet):
     def for_business(self, business):
         return self.filter(business=business)
     

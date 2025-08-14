@@ -1,6 +1,6 @@
 from rest_framework import permissions
 from rest_framework.decorators import action
-from apps.core.viewsets import TenantViewSet
+from apps.core.viewsets import TenantViewSet, OptimizedViewSetMixin
 from apps.core.permissions import BusinessManagerPermission, BusinessStaffPermission
 from apps.core.exceptions import success_response, error_response
 from .models import Service, ServiceCategory, ServiceProvider
@@ -26,13 +26,15 @@ class ServiceCategoryViewSet(TenantViewSet):
         return success_response(data=serializer.data)
 
 
-class ServiceViewSet(TenantViewSet):
+class ServiceViewSet(OptimizedViewSetMixin, TenantViewSet):
     queryset = Service.objects.all()
     serializer_class = ServiceSerializer
     permission_classes = [permissions.IsAuthenticated, BusinessStaffPermission]
     search_fields = ['name', 'description']
     filterset_fields = ['category', 'is_active', 'online_booking_enabled', 'voice_booking_enabled']
     ordering = ['order', 'name']
+    select_related_fields = ['category', 'business']
+    prefetch_related_fields = ['providers__user', 'resources']
     
     def get_serializer_class(self):
         if self.action == 'create':

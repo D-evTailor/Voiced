@@ -170,3 +170,39 @@ class SimpleModel(UUIDMixin, TimestampMixin, ActiveMixin):
 class BusinessModel(UUIDMixin, TimestampMixin, VersionMixin, ActiveMixin):
     class Meta:
         abstract = True
+
+
+class CountMixin(models.Model):
+    class Meta:
+        abstract = True
+    
+    @property
+    def active_count(self):
+        return getattr(self, self._count_relation).filter(is_active=True).count()
+
+
+class TimeCalculationMixin(models.Model):
+    class Meta:
+        abstract = True
+    
+    @property
+    def end_time(self):
+        if hasattr(self, 'start_time') and hasattr(self, 'service') and self.start_time and self.service:
+            from datetime import timedelta
+            return self.start_time + timedelta(minutes=self.service.duration)
+        return None
+    
+    @property
+    def duration_display(self):
+        if hasattr(self, 'duration'):
+            hours, minutes = divmod(self.duration, 60)
+            if hours:
+                return f"{hours}h {minutes}m" if minutes else f"{hours}h"
+            return f"{minutes}m"
+        return None
+    
+    @property
+    def total_time_required(self):
+        if hasattr(self, 'duration') and hasattr(self, 'buffer_time'):
+            return self.duration + self.buffer_time
+        return getattr(self, 'duration', 0)
