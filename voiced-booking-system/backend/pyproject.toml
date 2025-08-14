@@ -1,0 +1,99 @@
+[tool.poetry]
+name = "voiceappoint-backend"
+version = "0.1.0"
+description = "VoiceAppoint Backend API - SaaS appointment booking system with phone agent"
+authors = ["VoiceAppoint Team <dev@voiceappoint.com>"]
+readme = "README.md"
+packages = [{include = "core"}, {include = "apps"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+Django = "^5.0.1"
+djangorestframework = "^3.14.0"
+django-cors-headers = "^4.3.1"
+psycopg2-binary = "^2.9.9"
+python-decouple = "^3.8"
+gunicorn = "^21.2.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+pytest-django = "^4.7.0"
+black = "^23.11.0"
+flake8 = "^6.1.0"
+isort = "^5.12.0"
+
+[tool.poetry.group.test.dependencies]
+pytest-cov = "^4.1.0"
+pytest-mock = "^3.12.0"
+freezegun = "^1.2.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  | migrations
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_django = "django"
+known_first_party = ["core", "apps"]
+sections = ["FUTURE", "STDLIB", "THIRDPARTY", "DJANGO", "FIRSTPARTY", "LOCALFOLDER"]
+
+[tool.mypy]
+python_version = "3.11"
+check_untyped_defs = true
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+plugins = ["mypy_django_plugin.main"]
+
+[tool.django-stubs]
+django_settings_module = "core.settings.development"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "core.settings.testing"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
+addopts = "--tb=short --strict-markers --disable-warnings"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+]
+
+[tool.coverage.run]
+source = "."
+omit = [
+    "*/venv/*",
+    "*/migrations/*",
+    "manage.py",
+    "*/settings/*",
+    "*/tests/*",
+    "*/__pycache__/*"
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+]

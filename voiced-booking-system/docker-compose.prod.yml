@@ -1,0 +1,115 @@
+# Production Docker Compose Configuration
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-voiceappoint}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    networks:
+      - voiceappoint-network
+    restart: unless-stopped
+    command: postgres -c 'max_connections=200' -c 'shared_buffers=256MB'
+
+  redis:
+    image: redis:7-alpine
+    networks:
+      - voiceappoint-network
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    command: >
+      sh -c "poetry run python manage.py migrate --noinput &&
+             poetry run python manage.py collectstatic --noinput &&
+             poetry run gunicorn core.wsgi:application --bind 0.0.0.0:8000 --workers 4 --threads 2 --timeout 60"
+    depends_on:
+      - db
+      - redis
+    networks:
+      - voiceappoint-network
+    environment:
+      - DEBUG=0
+      - DJANGO_SETTINGS_MODULE=core.settings.production
+    restart: unless-stopped
+    volumes:
+      - backend_static:/app/static
+      - backend_media:/app/media
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    environment:
+      - NODE_ENV=production
+    networks:
+      - voiceappoint-network
+    restart: unless-stopped
+
+  celery:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    command: poetry run celery -A core worker -l info --concurrency=2
+    depends_on:
+      - db
+      - redis
+    networks:
+      - voiceappoint-network
+    environment:
+      - DJANGO_SETTINGS_MODULE=core.settings.production
+    restart: unless-stopped
+
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    command: poetry run celery -A core beat -l info
+    depends_on:
+      - db
+      - redis
+    networks:
+      - voiceappoint-network
+    environment:
+      - DJANGO_SETTINGS_MODULE=core.settings.production
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - backend_static:/var/www/static:ro
+      - backend_media:/var/www/media:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - voiceappoint-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  backend_static:
+  backend_media:
+
+networks:
+  voiceappoint-network:
+    driver: bridge
