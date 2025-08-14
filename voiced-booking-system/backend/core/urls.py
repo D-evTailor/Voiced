@@ -1,10 +1,3 @@
-"""
-URL Configuration for VoiceAppoint project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.0/topics/http/urls/
-"""
-
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
@@ -20,6 +13,7 @@ api_v1_patterns = [
     path('auth/', include('apps.users.urls')),
     path('businesses/', include('apps.businesses.urls')),
     path('services/', include('apps.services.urls')),
+    path('resources/', include('apps.resources.urls')),
     path('appointments/', include('apps.appointments.urls')),
     path('payments/', include('apps.payments.urls')),
     path('vapi/', include('apps.vapi_integration.urls')),
@@ -39,9 +33,6 @@ urlpatterns = [
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
-    
-    # Health check
-    path('health/', include('apps.health.urls')),
 ]
 
 # Development URLs

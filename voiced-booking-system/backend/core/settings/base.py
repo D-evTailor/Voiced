@@ -43,9 +43,11 @@ THIRD_PARTY_APPS = [
 ]
 
 LOCAL_APPS = [
+    'apps.core',
     'apps.users',
     'apps.businesses',
     'apps.services',
+    'apps.resources',
     'apps.appointments',
     'apps.payments',
     'apps.vapi_integration',
