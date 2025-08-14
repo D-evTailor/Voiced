@@ -1,16 +1,17 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import EmailValidator
-from apps.core.mixins import BaseModel, TimeCalculationMixin
+from apps.core.mixins import BaseModel
 from apps.core.utils import generate_unique_reference, APPOINTMENT_STATUS_CHOICES, APPOINTMENT_SOURCE_CHOICES, PAYMENT_STATUS_CHOICES
 
 
-class Appointment(BaseModel, TimeCalculationMixin):
+class Appointment(BaseModel):
     service = models.ForeignKey('services.Service', on_delete=models.CASCADE, related_name='appointments')
     client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, related_name='appointments', null=True, blank=True)
     resources = models.ManyToManyField('resources.Resource', through='resources.AppointmentResource', related_name='appointments')
     
     start_time = models.DateTimeField(_('start time'))
+    end_time = models.DateTimeField(_('end time'))
     status = models.CharField(_('status'), max_length=20, choices=APPOINTMENT_STATUS_CHOICES, default='pending')
     source = models.CharField(_('booking source'), max_length=20, choices=APPOINTMENT_SOURCE_CHOICES, default='online')
     booking_reference = models.CharField(_('booking reference'), max_length=50, unique=True, blank=True)
@@ -35,8 +36,8 @@ class Appointment(BaseModel, TimeCalculationMixin):
         
         constraints = [
             models.CheckConstraint(
-                check=models.Q(start_time__isnull=False),
-                name='appointment_has_start_time'
+                check=models.Q(end_time__gt=models.F('start_time')),
+                name='appointment_end_after_start'
             ),
         ]
         
@@ -57,6 +58,11 @@ class Appointment(BaseModel, TimeCalculationMixin):
     def save(self, *args, **kwargs):
         if not self.booking_reference:
             self.booking_reference = self.generate_booking_reference()
+        
+        if not self.end_time and self.start_time and self.service:
+            from datetime import timedelta
+            self.end_time = self.start_time + timedelta(minutes=self.service.duration)
+        
         super().save(*args, **kwargs)
     
     def generate_booking_reference(self):

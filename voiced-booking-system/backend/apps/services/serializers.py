@@ -86,7 +86,7 @@ class ServiceListSerializer(serializers.ModelSerializer, CountSerializerMixin):
         model = Service
         fields = ['id', 'name', 'category_name', 'duration', 'duration_display', 
                  'price', 'is_active', 'online_booking_enabled', 'voice_booking_enabled',
-                 'providers_count', 'color']
+                 'providers_count']
     
     def get_providers_count(self, obj):
         return self.get_active_count(obj, 'providers')

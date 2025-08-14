@@ -81,7 +81,7 @@ class AppointmentViewSet(TenantViewSet):
     def complete(self, request, pk=None):
         appointment = self.get_object()
         appointment.status = 'completed'
-        appointment.actual_end_time = timezone.now()
+        appointment.end_time = timezone.now()
         appointment.save()
         return success_response(
             data={'status': appointment.status},
