@@ -33,11 +33,6 @@ class Appointment(BaseModel, ClientStatsMixin):
     customer_email = models.EmailField(_('customer email'), validators=[EmailValidator()], blank=True)
     customer_phone = models.CharField(_('customer phone'), max_length=20, blank=True)
     
-    vapi_call_id = models.CharField(_('vapi call ID'), max_length=255, blank=True)
-    vapi_call_duration = models.PositiveIntegerField(_('call duration seconds'), null=True, blank=True)
-    vapi_sentiment_score = models.FloatField(_('sentiment score'), null=True, blank=True)
-    vapi_summary = models.TextField(_('call summary'), blank=True)
-    
     class Meta:
         verbose_name = _('Appointment')
         verbose_name_plural = _('Appointments')
@@ -59,7 +54,6 @@ class Appointment(BaseModel, ClientStatsMixin):
             models.Index(fields=['status', 'start_time']),
             models.Index(fields=['source']),
             models.Index(fields=['booking_reference']),
-            models.Index(fields=['vapi_call_id']),
             models.Index(fields=['is_recurring']),
             models.Index(fields=['parent_appointment']),
         ]

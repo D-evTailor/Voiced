@@ -2,7 +2,8 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from apps.core.mixins import BaseModel
 from apps.core.managers import TenantManager
-from apps.core.utils import PHONE_REGEX_VALIDATOR, LANGUAGE_CHOICES
+from apps.core.utils import PHONE_REGEX_VALIDATOR
+from apps.core.choices import LANGUAGE_CHOICES
 
 
 class Client(BaseModel):

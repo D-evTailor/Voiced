@@ -18,7 +18,7 @@ class Command(BaseCommand):
         
         tenant_models = [
             'appointments.Appointment',
-            'appointments.Client', 
+            'clients.Client', 
             'services.ServiceProvider',
             'services.Service',
             'services.ServiceCategory',
@@ -27,7 +27,10 @@ class Command(BaseCommand):
             'businesses.Business',
             'payments.Payment',
             'payments.Subscription',
-            'vapi_integration.VapiCallLog',
+            'vapi_integration.VapiCall',
+            'vapi_integration.VapiCallTranscript',
+            'vapi_integration.VapiCallAnalysis',
+            'vapi_integration.VapiAppointmentIntegration',
             'vapi_integration.VapiConfiguration',
             'notifications.Notification',
             'analytics.BusinessMetrics',

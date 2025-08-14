@@ -1,3 +1,8 @@
+import uuid
+import random
+import string
+from datetime import datetime
+from django.utils.text import slugify
 from django.core.validators import RegexValidator
 from django.utils.translation import gettext_lazy as _
 
@@ -7,31 +12,12 @@ PHONE_REGEX_VALIDATOR = RegexValidator(
     message=_('Phone number must be entered in the format: "+999999999". Up to 15 digits allowed.')
 )
 
-COMMON_STATUS_CHOICES = [
-    ('active', _('Active')),
-    ('inactive', _('Inactive')),
-    ('pending', _('Pending')),
-    ('cancelled', _('Cancelled')),
-]
-
-LANGUAGE_CHOICES = [
-    ('es', _('Spanish')),
-    ('en', _('English')),
-]
-
-CURRENCY_CHOICES = [
-    ('EUR', _('Euro')),
-    ('USD', _('US Dollar')),
-    ('GBP', _('British Pound')),
-]
-
 BUSINESS_TYPE_CHOICES = [
     ('salon', _('Hair Salon')),
     ('clinic', _('Medical Clinic')),
     ('restaurant', _('Restaurant')),
     ('spa', _('Spa')),
     ('dental', _('Dental Clinic')),
-    ('veterinary', _('Veterinary')),
     ('fitness', _('Fitness Center')),
     ('other', _('Other'))
 ]
@@ -43,25 +29,31 @@ APPOINTMENT_STATUS_CHOICES = [
     ('completed', _('Completed')),
     ('cancelled', _('Cancelled')),
     ('no_show', _('No Show')),
-    ('rescheduled', _('Rescheduled')),
 ]
 
 APPOINTMENT_SOURCE_CHOICES = [
-    ('online', _('Online Booking')),
-    ('voice_agent', _('Voice Agent')),
-    ('manual', _('Manual Entry')),
-    ('phone_call', _('Phone Call')),
-    ('walk_in', _('Walk In')),
-    ('mobile_app', _('Mobile App')),
+    ('online', _('Online')),
+    ('phone', _('Phone')),
+    ('walk_in', _('Walk-in')),
+    ('vapi', _('Voice AI')),
+    ('admin', _('Admin')),
 ]
 
 PAYMENT_STATUS_CHOICES = [
     ('pending', _('Pending')),
     ('paid', _('Paid')),
-    ('partially_paid', _('Partially Paid')),
-    ('refunded', _('Refunded')),
+    ('partial', _('Partial')),
     ('failed', _('Failed')),
-    ('waived', _('Waived')),
+    ('refunded', _('Refunded')),
+]
+
+CLIENT_SOURCE_CHOICES = [
+    ('website', _('Website')),
+    ('referral', _('Referral')),
+    ('social_media', _('Social Media')),
+    ('vapi', _('Voice AI')),
+    ('walk_in', _('Walk-in')),
+    ('admin', _('Admin')),
 ]
 
 RESOURCE_TYPE_CHOICES = [
@@ -70,23 +62,23 @@ RESOURCE_TYPE_CHOICES = [
     ('equipment', _('Equipment')),
 ]
 
-COUNTRY_CHOICES = [
-    ('ES', _('Spain')),
-    ('US', _('United States')),
-    ('GB', _('United Kingdom')),
-    ('FR', _('France')),
-    ('DE', _('Germany')),
-]
+
+def generate_unique_id():
+    return str(uuid.uuid4())
 
 
-def generate_unique_reference(prefix, date_obj, length=5):
-    import random
-    import string
+def generate_unique_reference(prefix, date_obj, length=6):
+    if isinstance(date_obj, datetime):
+        date_str = date_obj.strftime('%y%m%d')
+    else:
+        date_str = date_obj.strftime('%y%m%d')
     
-    date_part = date_obj.strftime('%Y%m%d')
     random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
-    
-    return f"{prefix}-{date_part}-{random_part}"
+    return f"{prefix}{date_str}{random_part}"
+
+
+def generate_slug(text, max_length=50):
+    return slugify(text)[:max_length]
 
 
 def calculate_percentage_change(current, previous):
@@ -99,16 +91,3 @@ def get_business_hours_display(start_time, end_time, is_closed=False):
     if is_closed or not start_time or not end_time:
         return _('Closed')
     return f"{start_time.strftime('%H:%M')} - {end_time.strftime('%H:%M')}"
-
-
-def get_vapi_context_for_business_type(business_type):
-    contexts = {
-        'salon': 'Hair salon specializing in cuts, color, and styling services.',
-        'clinic': 'Medical clinic providing healthcare and consultation services.',
-        'restaurant': 'Restaurant offering dining reservations and table booking.',
-        'spa': 'Spa offering wellness and beauty treatments.',
-        'dental': 'Dental clinic providing oral health and dental care services.',
-        'veterinary': 'Veterinary clinic providing animal health services.',
-        'fitness': 'Fitness center offering training and workout sessions.',
-    }
-    return contexts.get(business_type, 'Business offering appointment-based services.')

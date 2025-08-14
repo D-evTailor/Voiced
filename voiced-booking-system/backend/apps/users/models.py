@@ -5,7 +5,7 @@ from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from apps.core.mixins import TimestampMixin, SimpleModel
-from apps.core.utils import LANGUAGE_CHOICES
+from apps.core.choices import LANGUAGE_CHOICES
 
 
 class UserManager(BaseUserManager):
