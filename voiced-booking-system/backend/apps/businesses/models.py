@@ -66,6 +66,21 @@ class Business(UUIDMixin, TimestampMixin):
         max_length=100,
         default='Spain'
     )
+    business_type = models.CharField(
+        _('business type'),
+        max_length=50,
+        choices=[
+            ('salon', _('Hair Salon')),
+            ('clinic', _('Medical Clinic')),
+            ('restaurant', _('Restaurant')),
+            ('spa', _('Spa')),
+            ('dental', _('Dental Clinic')),
+            ('veterinary', _('Veterinary')),
+            ('fitness', _('Fitness Center')),
+            ('other', _('Other'))
+        ],
+        default='other'
+    )
     locale = models.CharField(
         _('business locale'),
         max_length=10,

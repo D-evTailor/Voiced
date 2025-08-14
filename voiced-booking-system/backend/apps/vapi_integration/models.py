@@ -8,13 +8,11 @@ from django.utils.translation import gettext_lazy as _
 from apps.core.mixins import BaseModel, UUIDMixin, TimestampMixin
 
 
-class VapiConfig(BaseModel):
+class VapiConfiguration(BaseModel):
     vapi_phone_number = models.CharField(_('vapi phone number'), max_length=20, blank=True)
     assistant_id = models.CharField(_('Vapi assistant ID'), max_length=255)
-    vapi_voice_id = models.CharField(_('vapi voice ID'), max_length=100, blank=True)
     assistant_name = models.CharField(_('assistant name'), max_length=100, default='Booking Assistant')
     assistant_greeting = models.TextField(_('assistant greeting'), blank=True)
-    assistant_instructions = models.TextField(_('assistant instructions'), blank=True)
     language = models.CharField(
         _('language'),
         max_length=10,
@@ -24,31 +22,33 @@ class VapiConfig(BaseModel):
         ],
         default='es'
     )
-    voice_settings = models.JSONField(_('voice settings'), default=dict, blank=True)
     business_context = models.TextField(_('business context'), blank=True)
-    booking_instructions = models.TextField(_('booking instructions'), blank=True)
-    webhook_url = models.URLField(_('webhook URL'), blank=True)
-    webhook_secret = models.CharField(_('webhook secret'), max_length=100, blank=True)
-    max_call_duration_minutes = models.PositiveIntegerField(
-        _('max call duration minutes'),
-        default=10,
-        validators=[MinValueValidator(1), MaxValueValidator(60)]
-    )
-    enable_call_recording = models.BooleanField(_('enable call recording'), default=False)
-    enable_transcription = models.BooleanField(_('enable transcription'), default=True)
     settings = models.JSONField(_('settings'), default=dict, blank=True)
     is_active = models.BooleanField(_('active'), default=True)
     
     class Meta:
         verbose_name = _('Vapi Configuration')
         verbose_name_plural = _('Vapi Configurations')
-        db_table = 'vapi_configs'
+        db_table = 'vapi_configurations'
         indexes = [
             models.Index(fields=['business', 'is_active']),
         ]
     
     def __str__(self):
         return f"{self.business.name} - Vapi Config"
+    
+    def get_context_for_business_type(self):
+        business_type = self.business.business_type
+        contexts = {
+            'salon': 'Hair salon specializing in cuts, color, and styling services.',
+            'clinic': 'Medical clinic providing healthcare and consultation services.',
+            'restaurant': 'Restaurant offering dining reservations and table booking.',
+            'spa': 'Spa offering wellness and beauty treatments.',
+            'dental': 'Dental clinic providing oral health and dental care services.',
+            'veterinary': 'Veterinary clinic providing animal health services.',
+            'fitness': 'Fitness center offering training and workout sessions.',
+        }
+        return contexts.get(business_type, 'Business offering appointment-based services.')
 
 
 class VapiCallLog(UUIDMixin, TimestampMixin):
