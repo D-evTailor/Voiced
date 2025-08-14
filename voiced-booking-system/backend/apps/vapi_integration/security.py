@@ -1,10 +1,9 @@
 import hashlib
 import hmac
-import time
 from typing import Optional
 from django.core.cache import cache
-from django.conf import settings
 from django.http import HttpRequest
+from .value_objects import WebhookSignature
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,18 +14,23 @@ class VapiSecurityService:
         self.secret = secret
     
     def validate_webhook_signature(self, request: HttpRequest, body: bytes) -> bool:
-        signature = request.headers.get('X-Vapi-Signature')
-        if not signature:
+        signature_header = request.headers.get('X-Vapi-Signature')
+        if not signature_header:
             logger.warning(f"Missing X-Vapi-Signature header from {request.META.get('REMOTE_ADDR')}")
             return False
         
-        expected_signature = self._generate_signature(body)
-        is_valid = hmac.compare_digest(signature, expected_signature)
-        
-        if not is_valid:
-            logger.warning(f"Invalid webhook signature from {request.META.get('REMOTE_ADDR')}")
-        
-        return is_valid
+        try:
+            signature = WebhookSignature(signature_header)
+            expected_signature = self._generate_signature(body)
+            is_valid = hmac.compare_digest(signature.signature, expected_signature)
+            
+            if not is_valid:
+                logger.warning(f"Invalid webhook signature from {request.META.get('REMOTE_ADDR')}")
+            
+            return is_valid
+        except ValueError as e:
+            logger.warning(f"Invalid signature format: {e}")
+            return False
     
     def _generate_signature(self, body: bytes) -> str:
         return hmac.new(

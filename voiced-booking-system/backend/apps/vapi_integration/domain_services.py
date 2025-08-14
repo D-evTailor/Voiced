@@ -1,0 +1,169 @@
+from typing import Dict, List, Optional
+from datetime import datetime, timedelta
+from django.utils import timezone
+from django.db import transaction
+from apps.services.models import Service
+from apps.appointments.models import Appointment
+from apps.clients.models import Client
+from .value_objects import AppointmentBookingData
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class AppointmentBookingDomainService:
+    def __init__(self, business):
+        self.business = business
+    
+    def book_appointment(self, booking_data: AppointmentBookingData) -> Dict[str, any]:
+        if not booking_data.is_valid:
+            return {'success': False, 'error': 'Invalid booking data'}
+        
+        try:
+            with transaction.atomic():
+                service = self._find_service(booking_data.service_name)
+                if not service:
+                    return {'success': False, 'error': 'Service not found'}
+                
+                start_time = datetime.fromisoformat(booking_data.datetime_iso)
+                
+                if not self._is_slot_available(service, start_time):
+                    return {'success': False, 'error': 'Time slot not available'}
+                
+                client = self._get_or_create_client(booking_data)
+                appointment = self._create_appointment(service, client, booking_data, start_time)
+                
+                logger.info(f"Appointment booked: {appointment.id} for business {self.business.id}")
+                return {
+                    'success': True,
+                    'appointment_id': appointment.id,
+                    'booking_reference': appointment.booking_reference
+                }
+                
+        except Exception as e:
+            logger.error(f"Booking failed: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    def _find_service(self, service_name: str) -> Optional[Service]:
+        return Service.objects.filter(
+            business=self.business,
+            name__icontains=service_name,
+            is_active=True
+        ).first()
+    
+    def _is_slot_available(self, service: Service, start_time: datetime) -> bool:
+        end_time = start_time + timedelta(minutes=service.duration)
+        
+        return not Appointment.objects.filter(
+            business=self.business,
+            service=service,
+            start_time__lt=end_time,
+            end_time__gt=start_time,
+            status__in=['confirmed', 'in_progress']
+        ).exists()
+    
+    def _get_or_create_client(self, booking_data: AppointmentBookingData) -> Optional[Client]:
+        if not booking_data.client_phone:
+            return None
+        
+        client, created = Client.objects.get_or_create(
+            business=self.business,
+            phone=booking_data.client_phone,
+            defaults={
+                'name': booking_data.client_name or 'Unknown',
+                'email': booking_data.client_email,
+                'source': 'vapi'
+            }
+        )
+        
+        if created:
+            logger.info(f"Created client: {client.id}")
+        
+        return client
+    
+    def _create_appointment(self, service: Service, client: Optional[Client], 
+                          booking_data: AppointmentBookingData, start_time: datetime) -> Appointment:
+        return Appointment.objects.create(
+            business=self.business,
+            service=service,
+            client=client,
+            start_time=start_time,
+            source='vapi',
+            customer_name=booking_data.client_name,
+            customer_phone=booking_data.client_phone,
+            customer_email=booking_data.client_email,
+            client_notes=booking_data.notes,
+            status='confirmed'
+        )
+
+
+class AvailabilityQueryService:
+    def __init__(self, business):
+        self.business = business
+    
+    def get_available_services(self) -> List[Dict]:
+        return list(Service.objects.filter(
+            business=self.business,
+            is_active=True
+        ).values('id', 'name', 'description', 'duration', 'price'))
+    
+    def check_availability(self, service_id: int, date: str, duration: Optional[int] = None) -> Dict:
+        try:
+            service = Service.objects.get(id=service_id, business=self.business)
+            date_obj = datetime.fromisoformat(date).date()
+            duration_minutes = duration or service.duration
+            
+            slots = self._find_available_slots(service, date_obj, duration_minutes)
+            
+            return {
+                'available': len(slots) > 0,
+                'slots': slots,
+                'service_name': service.name,
+                'duration': duration_minutes
+            }
+        except Service.DoesNotExist:
+            return {'available': False, 'error': 'Service not found'}
+        except ValueError:
+            return {'available': False, 'error': 'Invalid date format'}
+    
+    def _find_available_slots(self, service: Service, date_obj, duration_minutes: int) -> List[str]:
+        start_time = timezone.datetime.combine(date_obj, timezone.datetime.min.time().replace(hour=9))
+        end_time = timezone.datetime.combine(date_obj, timezone.datetime.min.time().replace(hour=18))
+        
+        existing_appointments = Appointment.objects.filter(
+            business=self.business,
+            service=service,
+            start_time__date=date_obj,
+            status__in=['confirmed', 'in_progress']
+        ).values_list('start_time', 'end_time')
+        
+        slots = []
+        current_time = start_time
+        slot_duration = timedelta(minutes=duration_minutes)
+        
+        while current_time + slot_duration <= end_time:
+            slot_end = current_time + slot_duration
+            
+            is_available = not any(
+                (current_time < end and slot_end > start)
+                for start, end in existing_appointments
+            )
+            
+            if is_available:
+                slots.append(current_time.isoformat())
+            
+            current_time += timedelta(minutes=30)
+        
+        return slots
+
+
+class CallAnalysisDomainService:
+    def extract_booking_data(self, structured_data: Dict) -> Optional[AppointmentBookingData]:
+        if not structured_data:
+            return None
+        
+        try:
+            return AppointmentBookingData.from_structured_data(structured_data)
+        except Exception as e:
+            logger.error(f"Error extracting booking data: {e}")
+            return None

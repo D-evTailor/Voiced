@@ -3,7 +3,7 @@ from django.utils import timezone
 from .models import VapiCall, VapiAppointmentIntegration
 from apps.appointments.models import Appointment
 from apps.clients.models import Client
-from .services import VapiCallAnalyzer, VapiIntegrationService
+from .domain_services import CallAnalysisDomainService, AppointmentBookingDomainService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,16 +15,12 @@ def process_call_completion(call_id):
         call = VapiCall.objects.get(id=call_id)
         
         if hasattr(call, 'analysis') and call.analysis.structured_data:
-            structured_data = call.analysis.structured_data
+            analysis_service = CallAnalysisDomainService()
+            booking_data = analysis_service.extract_booking_data(call.analysis.structured_data)
             
-            analyzer = VapiCallAnalyzer(call)
-            appointment_data = analyzer.extract_appointment_data(structured_data)
-            
-            if appointment_data:
-                client = get_or_create_client_from_call(call)
-                
-                integration_service = VapiIntegrationService(call.business)
-                booking_result = integration_service.attempt_booking(appointment_data)
+            if booking_data and booking_data.is_valid:
+                booking_service = AppointmentBookingDomainService(call.business)
+                booking_result = booking_service.book_appointment(booking_data)
                 
                 if booking_result.get('success'):
                     try:
@@ -33,7 +29,7 @@ def process_call_completion(call_id):
                             call=call,
                             appointment=appointment,
                             booking_successful=True,
-                            extracted_data=structured_data
+                            extracted_data=call.analysis.structured_data
                         )
                         logger.info(f"Successfully processed call {call.call_id} and created appointment {appointment.id}")
                     except Appointment.DoesNotExist:
@@ -44,9 +40,11 @@ def process_call_completion(call_id):
                         appointment=None,
                         booking_successful=False,
                         booking_error=booking_result.get('error', 'Unknown error'),
-                        extracted_data=structured_data
+                        extracted_data=call.analysis.structured_data
                     )
                     logger.warning(f"Booking failed for call {call.call_id}: {booking_result.get('error')}")
+            else:
+                logger.info(f"No valid booking data for call {call.call_id}")
         
         return f"Processed call {call.call_id}"
         

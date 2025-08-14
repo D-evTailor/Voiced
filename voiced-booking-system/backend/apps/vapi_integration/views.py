@@ -8,9 +8,10 @@ from django.views.decorators.csrf import csrf_exempt
 from apps.core.permissions import IsBusinessMember
 from apps.businesses.models import Business
 from .models import VapiConfiguration, VapiCall
-from .serializers import VapiConfigurationSerializer, VapiCallSerializer, VapiWebhookSerializer
+from .serializers import VapiConfigurationSerializer, VapiCallSerializer
 from .security import WebhookSecurityManager
 from .processors import WebhookProcessor
+from .value_objects import BusinessSlug
 import logging
 
 logger = logging.getLogger(__name__)
@@ -73,28 +74,29 @@ class VapiWebhookViewSet(viewsets.ViewSet):
     permission_classes = []
     
     def create(self, request):
-        business_slug = request.headers.get('X-Business-Slug')
-        if not business_slug:
-            logger.error("Missing X-Business-Slug header in webhook request")
-            return Response({'error': 'Business slug required'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            business_slug = BusinessSlug(request.headers.get('X-Business-Slug', ''))
+        except ValueError:
+            logger.error("Missing or invalid X-Business-Slug header")
+            return Response({'error': 'Valid business slug required'}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            business = Business.objects.get(slug=business_slug)
+            business = Business.objects.get(slug=business_slug.value)
         except Business.DoesNotExist:
-            logger.error(f"Business not found: {business_slug}")
+            logger.error(f"Business not found: {business_slug.value}")
             return Response({'error': 'Business not found'}, status=status.HTTP_404_NOT_FOUND)
         
         security_manager = WebhookSecurityManager(business)
         if not security_manager.validate_request(request, request.body):
-            logger.error(f"Security validation failed for business {business_slug}")
+            logger.error(f"Security validation failed for business {business_slug.value}")
             return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
         
         processor = WebhookProcessor(business)
         result = processor.process_webhook(request.data)
         
         if result['status'] == 'success':
-            logger.info(f"Webhook processed successfully for business {business_slug}")
+            logger.info(f"Webhook processed successfully for business {business_slug.value}")
             return Response(result, status=status.HTTP_200_OK)
         else:
-            logger.error(f"Webhook processing failed for business {business_slug}: {result}")
+            logger.error(f"Webhook processing failed for business {business_slug.value}: {result}")
             return Response(result, status=status.HTTP_400_BAD_REQUEST)
