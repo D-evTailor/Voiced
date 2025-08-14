@@ -11,8 +11,8 @@ help: ## Show this help message
 # Development Commands
 setup: ## Initial project setup
 	@echo "🚀 Setting up VoiceAppoint development environment..."
-	@cp .env.example .env || echo ".env already exists"
-	@echo "📝 Please edit .env file with your configuration"
+	@cp .env.example .env 2>/dev/null || echo ".env already exists"
+	@cp backend/.env.example backend/.env 2>/dev/null || echo "backend/.env already exists"
 	@echo "✅ Setup complete! Run 'make dev' to start development"
 
 dev: ## Start development environment
@@ -68,9 +68,9 @@ db-shell: ## Access database shell
 	@echo "🐘 Opening database shell..."
 	@docker-compose exec db psql -U postgres -d voiceappoint
 
-superuser: ## Create Django superuser
+superuser: ## Create Django superuser (idempotent)
 	@echo "👤 Creating Django superuser..."
-	@docker-compose exec backend poetry run python manage.py createsuperuser
+	@docker-compose exec backend poetry run python manage.py create_sample_data --skip-superuser
 
 # Backend Commands
 backend-shell: ## Access backend container shell
@@ -217,10 +217,12 @@ monitor: ## Start monitoring tools
 	@docker-compose -f docker-compose.monitoring.yml up -d
 
 # Quick Actions
-quick-start: setup dev-build db-migrate superuser ## Complete quick start setup
+quick-start: setup dev-build db-migrate ## Complete quick start setup
+	@echo "👤 Setting up users and sample data..."
+	@docker-compose exec backend poetry run python manage.py create_sample_data
 	@echo "🎉 VoiceAppoint is ready!"
 	@echo "Frontend: http://localhost:3000"
 	@echo "Backend: http://localhost:8000"
-	@echo "Admin: http://localhost:8000/admin"
+	@echo "Admin: http://localhost:8000/admin (admin@voiceappoint.com / admin123)"
 
 fresh-start: clean quick-start ## Clean start from scratch

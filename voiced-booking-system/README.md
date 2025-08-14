@@ -31,45 +31,40 @@ git clone <repository-url>
 cd voiced-booking-system
 ```
 
-### 2. Quick Start (Recomendado)
+### 2. Quick Start
 
 ```bash
-# Script automático que configura todo
-./scripts/start-dev.sh
+make quick-start
 ```
 
 ### 3. Manual Setup
 
 ```bash
-# Crear archivos de configuración
-cp .env.example .env
-cp backend/.env.example backend/.env
-
-# Iniciar servicios
-docker-compose up --build
+make setup
+make dev-build  
+make db-migrate
 ```
 
-### 4. Verificar Instalación
+### 4. Verificar que Todo Funciona ✅
+
+Después de cualquiera de los métodos anteriores, verifica que estos enlaces funcionen:
+
+- **🎨 Frontend**: http://localhost:3000
+- **⚙️ Backend API**: http://localhost:8000
+- **👤 Django Admin**: http://localhost:8000/admin (admin@voiceappoint.com / admin123)
+- **📚 API Docs**: http://localhost:8000/api/docs
+- **🗄️ PgAdmin** (desarrollo): http://localhost:8080 (admin@voiceappoint.com / admin)
+- **📊 Redis Commander** (desarrollo): http://localhost:8081
+
+### 5. Comandos Útiles
 
 ```bash
-# Run migrations
-docker-compose exec backend poetry run python manage.py migrate
-
-# Create superuser
-docker-compose exec backend poetry run python manage.py createsuperuser
-
-# Load sample data (optional)
-docker-compose exec backend poetry run python manage.py loaddata sample_data.json
+make dev              # Desarrollo diario
+make stop             # Parar servicios  
+make logs             # Ver logs
+make clean            # Limpiar Docker
+make fresh-start      # Reset completo
 ```
-
-### 4. Access Applications
-
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000
-- **Django Admin**: http://localhost:8000/admin
-- **API Docs**: http://localhost:8000/api/docs
-- **PgAdmin** (dev): http://localhost:8080
-- **Redis Commander** (dev): http://localhost:8081
 
 ## 🛠️ Development
 
@@ -129,6 +124,7 @@ docker-compose exec backend bash
 docker-compose exec backend poetry run python manage.py migrate
 
 # Create migrations
+```
 docker-compose exec backend poetry run python manage.py makemigrations
 
 # Run tests

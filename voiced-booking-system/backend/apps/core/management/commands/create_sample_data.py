@@ -18,9 +18,28 @@ class Command(BaseCommand):
         parser.add_argument('--businesses', type=int, default=3, help='Number of businesses to create')
         parser.add_argument('--services', type=int, default=10, help='Number of services to create')
         parser.add_argument('--appointments', type=int, default=20, help='Number of appointments to create')
+        parser.add_argument('--skip-superuser', action='store_true', help='Skip superuser creation')
     
     def handle(self, *args, **options):
         self.stdout.write('Creating sample data...')
+        
+        if not options['skip_superuser']:
+            admin_user, created = User.objects.get_or_create(
+                email='admin@voiceappoint.com',
+                defaults={
+                    'username': 'admin',
+                    'first_name': 'Admin',
+                    'last_name': 'User',
+                    'is_superuser': True,
+                    'is_staff': True
+                }
+            )
+            if created:
+                admin_user.set_password('admin123')
+                admin_user.save()
+                self.stdout.write(f'Created superuser: {admin_user.email}')
+            else:
+                self.stdout.write(f'Superuser already exists: {admin_user.email}')
         
         users = []
         for i in range(options['users']):
