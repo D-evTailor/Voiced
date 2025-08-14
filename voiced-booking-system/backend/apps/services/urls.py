@@ -5,9 +5,9 @@ from . import views
 app_name = 'services'
 
 router = DefaultRouter()
-router.register(r'categories', views.ServiceCategoryViewSet, basename='category')
-router.register(r'services', views.ServiceViewSet, basename='service')
-router.register(r'providers', views.ServiceProviderViewSet, basename='provider')
+router.register('categories', views.ServiceCategoryViewSet, basename='category')
+router.register('services', views.ServiceViewSet, basename='service')
+router.register('providers', views.ServiceProviderViewSet, basename='provider')
 
 urlpatterns = [
     path('', include(router.urls)),

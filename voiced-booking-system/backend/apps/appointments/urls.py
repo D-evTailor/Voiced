@@ -5,7 +5,8 @@ from . import views
 app_name = 'appointments'
 
 router = DefaultRouter()
-router.register(r'appointments', views.AppointmentViewSet, basename='appointment')
+router.register('appointments', views.AppointmentViewSet, basename='appointment')
+router.register('clients', views.ClientViewSet, basename='client')
 
 urlpatterns = [
     path('availability/', views.AvailabilityView.as_view(), name='availability'),
