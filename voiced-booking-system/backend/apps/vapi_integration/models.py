@@ -1,8 +1,8 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from decimal import Decimal
 from apps.core.mixins import BaseModel, SimpleModel
 from apps.core.choices import VAPI_CALL_STATUS_CHOICES, VAPI_CALL_TYPE_CHOICES, VAPI_ENDED_REASON_CHOICES, LANGUAGE_CHOICES
+from .cache_manager import VapiCacheManager
 
 
 class VapiConfiguration(BaseModel):
@@ -23,6 +23,15 @@ class VapiConfiguration(BaseModel):
     
     def __str__(self):
         return f"{self.business.name} - Vapi Config"
+    
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        VapiCacheManager.invalidate_config_cache(self.business_id)
+    
+    def delete(self, *args, **kwargs):
+        business_id = self.business_id
+        super().delete(*args, **kwargs)
+        VapiCacheManager.invalidate_config_cache(business_id)
 
 
 class VapiCall(SimpleModel):

@@ -1,9 +1,10 @@
-import hashlib
-import hmac
 from typing import Optional
 from django.core.cache import cache
 from django.http import HttpRequest
 from .value_objects import WebhookSignature
+from .optimizations import cached_method, cache_service
+import hashlib
+import hmac
 import logging
 
 logger = logging.getLogger(__name__)
@@ -60,9 +61,9 @@ class WebhookRateLimiter:
 class WebhookSecurityManager:
     def __init__(self, business):
         self.business = business
-        self.security_service = self._get_security_service()
         self.rate_limiter = WebhookRateLimiter()
     
+    @cached_method(timeout=600, key_func=lambda self: cache_service.get_business_config_key(self.business.id))
     def _get_security_service(self) -> Optional[VapiSecurityService]:
         try:
             config = self.business.vapi_configurations.filter(is_active=True).first()
@@ -78,8 +79,9 @@ class WebhookSecurityManager:
         if not self.rate_limiter.is_allowed(f"{self.business.id}:{client_ip}"):
             return False
         
-        if self.security_service:
-            return self.security_service.validate_webhook_signature(request, body)
+        security_service = self._get_security_service()
+        if security_service:
+            return security_service.validate_webhook_signature(request, body)
         
         logger.warning(f"No security configuration for business {self.business.id}")
         return True

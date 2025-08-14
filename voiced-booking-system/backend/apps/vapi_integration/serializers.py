@@ -50,16 +50,6 @@ class VapiCallSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at', 'duration_seconds']
 
 
-class VapiCallCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = VapiCall
-        fields = [
-            'call_id', 'org_id', 'type', 'status', 'ended_reason',
-            'started_at', 'ended_at', 'cost', 'cost_breakdown',
-            'phone_number', 'customer_number'
-        ]
-
-
 class VapiWebhookSerializer(serializers.Serializer):
     event = serializers.CharField()
     call = serializers.DictField()

@@ -6,6 +6,7 @@ from apps.services.models import Service
 from apps.appointments.models import Appointment
 from apps.clients.models import Client
 from .value_objects import AppointmentBookingData
+from .optimizations import cached_method, circuit_breaker, cache_service
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,6 +16,7 @@ class AppointmentBookingDomainService:
     def __init__(self, business):
         self.business = business
     
+    @circuit_breaker
     def book_appointment(self, booking_data: AppointmentBookingData) -> Dict[str, any]:
         if not booking_data.is_valid:
             return {'success': False, 'error': 'Invalid booking data'}
@@ -33,6 +35,8 @@ class AppointmentBookingDomainService:
                 client = self._get_or_create_client(booking_data)
                 appointment = self._create_appointment(service, client, booking_data, start_time)
                 
+                self._invalidate_availability_cache(service, start_time)
+                
                 logger.info(f"Appointment booked: {appointment.id} for business {self.business.id}")
                 return {
                     'success': True,
@@ -45,7 +49,7 @@ class AppointmentBookingDomainService:
             return {'success': False, 'error': str(e)}
     
     def _find_service(self, service_name: str) -> Optional[Service]:
-        return Service.objects.filter(
+        return Service.objects.select_related('business').filter(
             business=self.business,
             name__icontains=service_name,
             is_active=True
@@ -95,25 +99,39 @@ class AppointmentBookingDomainService:
             client_notes=booking_data.notes,
             status='confirmed'
         )
+    
+    def _invalidate_availability_cache(self, service: Service, start_time: datetime):
+        date_str = start_time.date().isoformat()
+        cache_key = cache_service.get_availability_key(self.business.id, service.id, date_str)
+        cache_service.invalidate_pattern(f"vapi_availability:{self.business.id}:{service.id}:*")
 
 
 class AvailabilityQueryService:
     def __init__(self, business):
         self.business = business
     
+    @cached_method(timeout=600, key_func=lambda self: cache_service.get_services_key(self.business.id))
     def get_available_services(self) -> List[Dict]:
         return list(Service.objects.filter(
             business=self.business,
             is_active=True
         ).values('id', 'name', 'description', 'duration', 'price'))
     
+    @cached_method(timeout=300)
     def check_availability(self, service_id: int, date: str, duration: Optional[int] = None) -> Dict:
         try:
-            service = Service.objects.get(id=service_id, business=self.business)
+            service = Service.objects.select_related('business').get(
+                id=service_id, business=self.business
+            )
             date_obj = datetime.fromisoformat(date).date()
             duration_minutes = duration or service.duration
             
-            slots = self._find_available_slots(service, date_obj, duration_minutes)
+            cache_key = cache_service.get_availability_key(self.business.id, service_id, date)
+            slots = cache_service.get_or_set(
+                cache_key,
+                lambda: self._find_available_slots(service, date_obj, duration_minutes),
+                timeout=900
+            )
             
             return {
                 'available': len(slots) > 0,

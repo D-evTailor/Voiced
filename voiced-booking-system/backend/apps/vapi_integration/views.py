@@ -25,7 +25,9 @@ class VapiConfigurationViewSet(viewsets.ModelViewSet):
         business_id = self.kwargs.get('business_id') or self.request.query_params.get('business_id')
         if business_id:
             business = get_object_or_404(Business, id=business_id)
-            return VapiConfiguration.objects.filter(business=business, is_active=True)
+            return VapiConfiguration.objects.select_related('business').filter(
+                business=business, is_active=True
+            )
         return VapiConfiguration.objects.none()
     
     def perform_create(self, serializer):
@@ -43,8 +45,8 @@ class VapiCallViewSet(viewsets.ReadOnlyModelViewSet):
         if business_id:
             business = get_object_or_404(Business, id=business_id)
             return VapiCall.objects.filter(business=business).select_related(
-                'transcript', 'analysis', 'appointment_integration__appointment'
-            )
+                'business', 'transcript', 'analysis'
+            ).prefetch_related('appointment_integration__appointment')
         return VapiCall.objects.none()
     
     @action(detail=True, methods=['get'])

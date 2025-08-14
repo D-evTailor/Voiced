@@ -62,7 +62,7 @@ def get_or_create_client_from_call(call):
     
     if phone:
         try:
-            client, created = Client.objects.get_or_create(
+            client, created = Client.objects.select_related('business').get_or_create(
                 business=business,
                 phone=phone,
                 defaults={
@@ -84,14 +84,26 @@ def get_or_create_client_from_call(call):
 def sync_vapi_calls_status():
     from datetime import timedelta
     
-    pending_calls = VapiCall.objects.filter(
+    pending_calls = VapiCall.objects.select_related('business').filter(
         status__in=['queued', 'ringing', 'in_progress'],
         created_at__gte=timezone.now() - timedelta(hours=24)
     )
     
     logger.info(f"Found {pending_calls.count()} pending calls to sync")
-    
-    for call in pending_calls:
-        pass
-    
     return f"Synced {pending_calls.count()} calls"
+
+
+@shared_task
+def cleanup_old_call_data():
+    from datetime import timedelta
+    
+    old_calls = VapiCall.objects.filter(
+        created_at__lt=timezone.now() - timedelta(days=90),
+        status='ended'
+    )
+    
+    count = old_calls.count()
+    old_calls.delete()
+    
+    logger.info(f"Cleaned up {count} old calls")
+    return f"Cleaned up {count} old calls"
