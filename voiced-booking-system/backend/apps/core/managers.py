@@ -29,8 +29,11 @@ class TenantManager(models.Manager):
         return super().create(**kwargs)
     
     def validate_subscription_limits(self, business):
-        subscription = getattr(business, 'subscription', None)
-        if not subscription or subscription.status != 'active':
+        if not hasattr(business, 'subscription') or not business.subscription:
+            return True
+            
+        subscription = business.subscription
+        if subscription.status != 'active':
             return True
             
         model_name = self.model.__name__
@@ -61,22 +64,3 @@ class TenantManager(models.Manager):
             )
         
         return True
-
-
-def validate_business_limits(business, model_class, limit_field):
-    if not hasattr(business, 'subscription') or not business.subscription:
-        return
-    
-    subscription = business.subscription
-    plan = subscription.plan
-    
-    current_count = model_class.objects.for_business(business).active().count()
-    limit = getattr(plan, limit_field, None)
-    
-    if limit and limit > 0 and current_count >= limit:
-        raise ValidationError(
-            _('You have reached the limit of {limit} {model_name} for your current plan.').format(
-                limit=limit,
-                model_name=model_class._meta.verbose_name_plural
-            )
-        )

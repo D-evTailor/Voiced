@@ -1,11 +1,7 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from apps.core.mixins import TimestampMixin
-
-from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db import models
-from django.utils.translation import gettext_lazy as _
 from apps.core.mixins import BaseModel, UUIDMixin, TimestampMixin
+from apps.core.utils import get_vapi_context_for_business_type
 
 
 class VapiConfiguration(BaseModel):
@@ -38,17 +34,7 @@ class VapiConfiguration(BaseModel):
         return f"{self.business.name} - Vapi Config"
     
     def get_context_for_business_type(self):
-        business_type = self.business.business_type
-        contexts = {
-            'salon': 'Hair salon specializing in cuts, color, and styling services.',
-            'clinic': 'Medical clinic providing healthcare and consultation services.',
-            'restaurant': 'Restaurant offering dining reservations and table booking.',
-            'spa': 'Spa offering wellness and beauty treatments.',
-            'dental': 'Dental clinic providing oral health and dental care services.',
-            'veterinary': 'Veterinary clinic providing animal health services.',
-            'fitness': 'Fitness center offering training and workout sessions.',
-        }
-        return contexts.get(business_type, 'Business offering appointment-based services.')
+        return get_vapi_context_for_business_type(self.business.business_type)
 
 
 class VapiCallLog(UUIDMixin, TimestampMixin):

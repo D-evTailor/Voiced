@@ -3,7 +3,7 @@ from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from apps.core.mixins import UUIDMixin, TimestampMixin
-from apps.core.utils import PHONE_REGEX_VALIDATOR, LANGUAGE_CHOICES, CURRENCY_CHOICES
+from apps.core.utils import PHONE_REGEX_VALIDATOR, LANGUAGE_CHOICES, CURRENCY_CHOICES, BUSINESS_TYPE_CHOICES
 import uuid
 
 class Business(UUIDMixin, TimestampMixin):
@@ -69,16 +69,7 @@ class Business(UUIDMixin, TimestampMixin):
     business_type = models.CharField(
         _('business type'),
         max_length=50,
-        choices=[
-            ('salon', _('Hair Salon')),
-            ('clinic', _('Medical Clinic')),
-            ('restaurant', _('Restaurant')),
-            ('spa', _('Spa')),
-            ('dental', _('Dental Clinic')),
-            ('veterinary', _('Veterinary')),
-            ('fitness', _('Fitness Center')),
-            ('other', _('Other'))
-        ],
+        choices=BUSINESS_TYPE_CHOICES,
         default='other'
     )
     locale = models.CharField(

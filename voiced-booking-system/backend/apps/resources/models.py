@@ -3,17 +3,12 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from apps.core.mixins import BaseModel
 from apps.core.managers import TenantManager
+from apps.core.utils import RESOURCE_TYPE_CHOICES
 
 
 class Resource(BaseModel):
-    RESOURCE_TYPES = [
-        ('staff', _('Staff')),
-        ('room', _('Room')),
-        ('equipment', _('Equipment')),
-    ]
-    
     name = models.CharField(_('name'), max_length=100)
-    type = models.CharField(_('type'), max_length=20, choices=RESOURCE_TYPES)
+    type = models.CharField(_('type'), max_length=20, choices=RESOURCE_TYPE_CHOICES)
     description = models.TextField(_('description'), blank=True)
     user = models.OneToOneField(
         'users.User',

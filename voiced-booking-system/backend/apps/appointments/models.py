@@ -3,39 +3,11 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import EmailValidator
 from apps.core.mixins import BaseModel
-from apps.core.utils import generate_unique_reference
+from apps.core.utils import generate_unique_reference, APPOINTMENT_STATUS_CHOICES, APPOINTMENT_SOURCE_CHOICES, PAYMENT_STATUS_CHOICES
 from decimal import Decimal
 import uuid
 
 class Appointment(BaseModel):
-    STATUS_CHOICES = [
-        ('pending', _('Pending')),
-        ('confirmed', _('Confirmed')),
-        ('in_progress', _('In Progress')),
-        ('completed', _('Completed')),
-        ('cancelled', _('Cancelled')),
-        ('no_show', _('No Show')),
-        ('rescheduled', _('Rescheduled')),
-    ]
-    
-    SOURCE_CHOICES = [
-        ('online', _('Online Booking')),
-        ('voice_agent', _('Voice Agent')),
-        ('manual', _('Manual Entry')),
-        ('phone_call', _('Phone Call')),
-        ('walk_in', _('Walk In')),
-        ('mobile_app', _('Mobile App')),
-    ]
-    
-    PAYMENT_STATUS_CHOICES = [
-        ('pending', _('Pending')),
-        ('paid', _('Paid')),
-        ('partially_paid', _('Partially Paid')),
-        ('refunded', _('Refunded')),
-        ('failed', _('Failed')),
-        ('waived', _('Waived')),
-    ]
-    
     service = models.ForeignKey(
         'services.Service',
         on_delete=models.CASCADE,
@@ -58,8 +30,8 @@ class Appointment(BaseModel):
     
     start_time = models.DateTimeField(_('start time'))
     end_time = models.DateTimeField(_('end time'))
-    status = models.CharField(_('status'), max_length=20, choices=STATUS_CHOICES, default='pending')
-    source = models.CharField(_('booking source'), max_length=20, choices=SOURCE_CHOICES, default='online')
+    status = models.CharField(_('status'), max_length=20, choices=APPOINTMENT_STATUS_CHOICES, default='pending')
+    source = models.CharField(_('booking source'), max_length=20, choices=APPOINTMENT_SOURCE_CHOICES, default='online')
     booking_reference = models.CharField(_('booking reference'), max_length=50, unique=True, blank=True)
     
     quoted_price = models.DecimalField(_('quoted price'), max_digits=10, decimal_places=2, null=True, blank=True)
