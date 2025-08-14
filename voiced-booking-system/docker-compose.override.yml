@@ -1,6 +1,4 @@
 # Development override - Hot reload and debugging enabled
-version: '3.8'
-
 services:
   backend:
     build:

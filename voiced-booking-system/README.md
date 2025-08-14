@@ -29,20 +29,27 @@ VoiceAppoint is a modern multi-tenant SaaS system for automatic appointment book
 ```bash
 git clone <repository-url>
 cd voiced-booking-system
-cp .env.example .env
 ```
 
-### 2. Start Development Environment
+### 2. Quick Start (Recomendado)
 
 ```bash
-# Start all services
-docker-compose up
-
-# Or start in background
-docker-compose up -d
+# Script automático que configura todo
+./scripts/start-dev.sh
 ```
 
-### 3. Initialize Database
+### 3. Manual Setup
+
+```bash
+# Crear archivos de configuración
+cp .env.example .env
+cp backend/.env.example backend/.env
+
+# Iniciar servicios
+docker-compose up --build
+```
+
+### 4. Verificar Instalación
 
 ```bash
 # Run migrations
