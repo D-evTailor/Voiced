@@ -109,10 +109,17 @@ class BusinessMember(TimestampMixin):
         ('viewer', _('Viewer')),
     ]
     
+    ROLE_PERMISSIONS = {
+        'owner': ['all'],
+        'admin': ['manage_users', 'manage_services', 'view_reports', 'manage_appointments', 'manage_settings'],
+        'manager': ['manage_services', 'view_reports', 'manage_appointments'],
+        'staff': ['view_appointments', 'create_appointments'],
+        'viewer': ['view_appointments'],
+    }
+    
     business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name='members')
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='business_memberships')
     role = models.CharField(_('role'), max_length=20, choices=ROLE_CHOICES, default='staff')
-    permissions = models.JSONField(_('permissions'), default=dict, blank=True)
     is_primary = models.BooleanField(_('primary'), default=False)
     is_active = models.BooleanField(_('active'), default=True)
     joined_at = models.DateTimeField(_('joined at'), auto_now_add=True)
@@ -126,3 +133,8 @@ class BusinessMember(TimestampMixin):
     
     def __str__(self):
         return f"{self.user.email} - {self.business.name} ({self.role})"
+    
+    def has_permission(self, permission):
+        if self.role == 'owner':
+            return True
+        return permission in self.ROLE_PERMISSIONS.get(self.role, [])

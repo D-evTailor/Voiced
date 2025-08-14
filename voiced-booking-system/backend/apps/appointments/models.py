@@ -1,11 +1,11 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import EmailValidator
-from apps.core.mixins import BaseModel
+from apps.core.mixins import BaseModel, ClientStatsMixin
 from apps.core.utils import generate_unique_reference, APPOINTMENT_STATUS_CHOICES, APPOINTMENT_SOURCE_CHOICES, PAYMENT_STATUS_CHOICES
 
 
-class Appointment(BaseModel):
+class Appointment(BaseModel, ClientStatsMixin):
     service = models.ForeignKey('services.Service', on_delete=models.CASCADE, related_name='appointments')
     client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, related_name='appointments', null=True, blank=True)
     resources = models.ManyToManyField('resources.Resource', through='resources.AppointmentResource', related_name='appointments')
@@ -22,11 +22,21 @@ class Appointment(BaseModel):
     
     client_notes = models.TextField(_('client notes'), blank=True)
     staff_notes = models.TextField(_('staff notes'), blank=True)
-    metadata = models.JSONField(_('metadata'), default=dict, blank=True)
+    special_requirements = models.TextField(_('special requirements'), blank=True)
+    
+    is_recurring = models.BooleanField(_('recurring'), default=False)
+    recurrence_rule = models.JSONField(_('recurrence rule'), default=dict, blank=True)
+    parent_appointment = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='recurring_appointments')
+    group_size = models.PositiveIntegerField(_('group size'), default=1)
     
     customer_name = models.CharField(_('customer name'), max_length=200, blank=True)
     customer_email = models.EmailField(_('customer email'), validators=[EmailValidator()], blank=True)
     customer_phone = models.CharField(_('customer phone'), max_length=20, blank=True)
+    
+    vapi_call_id = models.CharField(_('vapi call ID'), max_length=255, blank=True)
+    vapi_call_duration = models.PositiveIntegerField(_('call duration seconds'), null=True, blank=True)
+    vapi_sentiment_score = models.FloatField(_('sentiment score'), null=True, blank=True)
+    vapi_summary = models.TextField(_('call summary'), blank=True)
     
     class Meta:
         verbose_name = _('Appointment')
@@ -49,6 +59,9 @@ class Appointment(BaseModel):
             models.Index(fields=['status', 'start_time']),
             models.Index(fields=['source']),
             models.Index(fields=['booking_reference']),
+            models.Index(fields=['vapi_call_id']),
+            models.Index(fields=['is_recurring']),
+            models.Index(fields=['parent_appointment']),
         ]
     
     def __str__(self):
@@ -64,6 +77,9 @@ class Appointment(BaseModel):
             self.end_time = self.start_time + timedelta(minutes=self.service.duration)
         
         super().save(*args, **kwargs)
+        
+        if self.status in ['completed', 'confirmed']:
+            self.update_client_stats()
     
     def generate_booking_reference(self):
         return generate_unique_reference(

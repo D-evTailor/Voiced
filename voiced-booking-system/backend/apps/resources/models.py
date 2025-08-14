@@ -101,6 +101,8 @@ class ServiceResource(models.Model):
     quantity_required = models.PositiveIntegerField(_('quantity required'), default=1, validators=[MinValueValidator(1)])
     is_required = models.BooleanField(_('required'), default=True)
     preference_order = models.PositiveIntegerField(_('preference order'), default=0)
+    setup_time = models.PositiveIntegerField(_('setup minutes'), default=0)
+    cleanup_time = models.PositiveIntegerField(_('cleanup minutes'), default=0)
     
     class Meta:
         verbose_name = _('Service Resource')

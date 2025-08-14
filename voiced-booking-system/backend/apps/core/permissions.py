@@ -1,5 +1,4 @@
 from rest_framework.permissions import BasePermission
-from rest_framework.exceptions import PermissionDenied
 
 
 class TenantPermission(BasePermission):
@@ -12,28 +11,27 @@ class TenantPermission(BasePermission):
         return True
 
 
-class BusinessOwnerPermission(BasePermission):
+class BusinessPermission(BasePermission):
+    required_permission = None
+    
     def has_permission(self, request, view):
-        if not hasattr(request, 'business'):
+        if not hasattr(request, 'business') or not request.business:
             return False
-        return request.business.tenant_users.filter(
-            user=request.user,
-            role__in=['owner', 'admin']
-        ).exists()
-
-
-class BusinessManagerPermission(BasePermission):
-    def has_permission(self, request, view):
-        if not hasattr(request, 'business'):
+        
+        member = request.business.members.filter(user=request.user, is_active=True).first()
+        if not member:
             return False
-        return request.business.tenant_users.filter(
-            user=request.user,
-            role__in=['owner', 'admin', 'manager']
-        ).exists()
+            
+        return member.has_permission(self.required_permission or 'view_appointments')
 
 
-class BusinessStaffPermission(BasePermission):
-    def has_permission(self, request, view):
-        if not hasattr(request, 'business'):
-            return False
-        return request.business.tenant_users.filter(user=request.user).exists()
+class BusinessOwnerPermission(BusinessPermission):
+    required_permission = 'all'
+
+
+class BusinessManagerPermission(BusinessPermission):
+    required_permission = 'manage_appointments'
+
+
+class BusinessStaffPermission(BusinessPermission):
+    required_permission = 'view_appointments'

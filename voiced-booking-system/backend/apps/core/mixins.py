@@ -181,6 +181,22 @@ class CountMixin(models.Model):
         return getattr(self, self._count_relation).filter(is_active=True).count()
 
 
+class ClientStatsMixin(models.Model):
+    class Meta:
+        abstract = True
+    
+    def update_client_stats(self):
+        if hasattr(self, 'client') and self.client:
+            from decimal import Decimal
+            appointments = self.client.appointments.filter(status__in=['completed', 'confirmed'])
+            self.client.total_appointments = appointments.count()
+            self.client.total_spent = sum(apt.final_price or Decimal('0') for apt in appointments)
+            self.client.last_appointment_date = appointments.order_by('-start_time').first()
+            if self.client.last_appointment_date:
+                self.client.last_appointment_date = self.client.last_appointment_date.start_time
+            self.client.save()
+
+
 class TimeCalculationMixin(models.Model):
     class Meta:
         abstract = True

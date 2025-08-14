@@ -14,6 +14,13 @@ class Client(BaseModel):
     preferred_language = models.CharField(_('preferred language'), max_length=10, choices=LANGUAGE_CHOICES, default='es')
     notes = models.TextField(_('notes'), blank=True)
     
+    total_spent = models.DecimalField(_('total spent'), max_digits=10, decimal_places=2, default=0)
+    total_appointments = models.PositiveIntegerField(_('total appointments'), default=0)
+    last_appointment_date = models.DateTimeField(_('last appointment'), null=True, blank=True)
+    preferred_staff = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='preferred_clients')
+    marketing_consent = models.BooleanField(_('marketing consent'), default=False)
+    voice_recognition_id = models.CharField(_('voice ID'), max_length=255, blank=True)
+    
     objects = TenantManager()
     
     class Meta:
