@@ -35,7 +35,7 @@ API_ENDPOINTS = {
         'endpoints': [
             '',                # GET/POST: Business list/create
             '{id}/',          # GET/PUT/PATCH/DELETE: Business detail
-            '{id}/add-member/', # POST: Add business member
+            '{id}/add_member/', # POST: Add business member
             'hours/',         # GET/POST/PUT/DELETE: Business hours
             'members/',       # GET/POST/PUT/DELETE: Business members
         ]
@@ -88,7 +88,7 @@ API_ENDPOINTS = {
     'analytics': {
         'base': '/api/v1/analytics/',
         'endpoints': [
-            '',              # GET: Analytics dashboard
+            'dashboard/',    # GET: Analytics dashboard
         ]
     },
     'resources': {
@@ -101,7 +101,11 @@ API_ENDPOINTS = {
     'vapi': {
         'base': '/api/v1/vapi/',
         'endpoints': [
-            'webhook/',      # POST: VAPI webhook handler
+            'webhook/',         # POST: VAPI webhook handler
+            'configs/',         # GET/POST: VAPI configurations
+            'calls/',           # GET/POST: VAPI calls
+            'register-tenant/', # POST: Register new tenant
+            'business/{id}/calls/outbound/', # POST: Make outbound call
         ]
     }
 }
