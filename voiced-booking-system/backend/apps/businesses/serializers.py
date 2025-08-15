@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from apps.core.serializers import TenantFilteredSerializer, CountSerializerMixin, UserFieldsMixin, DisplayFieldsMixin
+from apps.core.serializers import TenantFilteredSerializer, DisplayFieldsMixin
 from .models import Business, BusinessHours, BusinessMember
 
 
@@ -12,8 +12,7 @@ class BusinessHoursSerializer(serializers.ModelSerializer):
         fields = ['id', 'day_of_week', 'day_name', 'open_time', 'close_time', 'is_closed', 'is_open']
 
 
-class BusinessMemberSerializer(serializers.ModelSerializer, UserFieldsMixin, DisplayFieldsMixin):
-    role_display = serializers.CharField(source='get_role_display', read_only=True)
+class BusinessMemberSerializer(serializers.ModelSerializer, DisplayFieldsMixin):
     
     class Meta:
         model = BusinessMember
@@ -22,7 +21,7 @@ class BusinessMemberSerializer(serializers.ModelSerializer, UserFieldsMixin, Dis
         read_only_fields = ['joined_at']
 
 
-class BusinessSerializer(serializers.ModelSerializer, CountSerializerMixin):
+class BusinessSerializer(serializers.ModelSerializer, DisplayFieldsMixin):
     owner_email = serializers.EmailField(source='owner.email', read_only=True)
     full_address = serializers.CharField(read_only=True)
     business_hours = BusinessHoursSerializer(many=True, read_only=True)

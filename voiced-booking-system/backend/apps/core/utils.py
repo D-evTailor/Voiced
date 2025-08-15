@@ -10,6 +10,12 @@ PHONE_REGEX_VALIDATOR = RegexValidator(
     message=_('Phone number must be entered in the format: "+999999999". Up to 15 digits allowed.')
 )
 
+RESOURCE_TYPE_CHOICES = [
+    ('staff', _('Staff')),
+    ('room', _('Room')),
+    ('equipment', _('Equipment')),
+]
+
 def generate_unique_reference(prefix, date_obj, length=6):
     date_str = date_obj.strftime('%y%m%d')
     random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))

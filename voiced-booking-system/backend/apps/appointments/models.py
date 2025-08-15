@@ -1,12 +1,12 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import EmailValidator
-from apps.core.mixins import BaseModel, ClientStatsMixin
+from apps.core.mixins import BaseModel, BusinessStatsMixin, TimeCalculationMixin
 from apps.core.utils import generate_unique_reference
 from apps.core.choices import APPOINTMENT_STATUS_CHOICES, APPOINTMENT_SOURCE_CHOICES, PAYMENT_STATUS_CHOICES
 
 
-class Appointment(BaseModel, ClientStatsMixin):
+class Appointment(BaseModel, BusinessStatsMixin, TimeCalculationMixin):
     service = models.ForeignKey('services.Service', on_delete=models.CASCADE, related_name='appointments')
     client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, related_name='appointments', null=True, blank=True)
     resources = models.ManyToManyField('resources.Resource', through='resources.AppointmentResource', related_name='appointments')
@@ -68,8 +68,8 @@ class Appointment(BaseModel, ClientStatsMixin):
             self.booking_reference = self.generate_booking_reference()
         
         if not self.end_time and self.start_time and self.service:
-            from datetime import timedelta
-            self.end_time = self.start_time + timedelta(minutes=self.service.duration)
+            from apps.core.helpers import calculate_end_time
+            self.end_time = calculate_end_time(self.start_time, self.service.duration)
         
         super().save(*args, **kwargs)
         

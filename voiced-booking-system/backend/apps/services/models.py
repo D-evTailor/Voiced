@@ -2,11 +2,11 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from decimal import Decimal
-from apps.core.mixins import BaseModel, TimestampMixin, OrderMixin, CountMixin, TimeCalculationMixin
+from apps.core.mixins import BaseModel, BaseFieldsMixin, OrderMixin, BusinessStatsMixin, TimeCalculationMixin
 from apps.core.managers import TenantManager
 
 
-class ServiceCategory(BaseModel, OrderMixin, CountMixin):
+class ServiceCategory(BaseModel, OrderMixin, BusinessStatsMixin):
     name = models.CharField(_('category name'), max_length=100)
     description = models.TextField(_('description'), blank=True)
     _count_relation = 'services'
@@ -22,7 +22,7 @@ class ServiceCategory(BaseModel, OrderMixin, CountMixin):
         return f"{self.business.name} - {self.name}"
 
 
-class Service(BaseModel, OrderMixin, TimeCalculationMixin, CountMixin):
+class Service(BaseModel, OrderMixin, TimeCalculationMixin, BusinessStatsMixin):
     category = models.ForeignKey(ServiceCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='services')
     name = models.CharField(_('service name'), max_length=200)
     description = models.TextField(_('description'), blank=True)
@@ -53,7 +53,7 @@ class Service(BaseModel, OrderMixin, TimeCalculationMixin, CountMixin):
         return f"{self.business.name} - {self.name}"
 
 
-class ServiceProvider(TimestampMixin):
+class ServiceProvider(BaseFieldsMixin):
     service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='providers')
     user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='provided_services')
     is_primary = models.BooleanField(_('primary provider'), default=False)

@@ -62,11 +62,6 @@ class BaseViewSet(viewsets.ModelViewSet):
 
 class TenantViewSet(BaseViewSet):
     serializer_class = TenantFilteredSerializer
-    
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        context['business'] = self.request.business
-        return context
 
 
 class ReadOnlyTenantViewSet(viewsets.ReadOnlyModelViewSet):
@@ -85,9 +80,6 @@ class OptimizedViewSetMixin:
     
     def get_queryset(self):
         queryset = super().get_queryset()
-        return self.optimize_queryset(queryset)
-    
-    def optimize_queryset(self, queryset):
         if self.select_related_fields:
             queryset = queryset.select_related(*self.select_related_fields)
         if self.prefetch_related_fields:

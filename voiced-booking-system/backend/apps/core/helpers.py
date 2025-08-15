@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from datetime import datetime, timedelta
 from .constants import STATUS_TRANSITIONS
+from .utils import PHONE_REGEX_VALIDATOR
 
 
 def get_display_name(obj, name_fields=None):

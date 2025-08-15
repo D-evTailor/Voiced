@@ -1,9 +1,9 @@
 from rest_framework import serializers
-from apps.core.serializers import TenantFilteredSerializer, CountSerializerMixin, TimeFieldsMixin
+from apps.core.serializers import TenantFilteredSerializer, DisplayFieldsMixin
 from .models import Service, ServiceCategory, ServiceProvider
 
 
-class ServiceCategorySerializer(TenantFilteredSerializer, CountSerializerMixin):
+class ServiceCategorySerializer(TenantFilteredSerializer, DisplayFieldsMixin):
     services_count = serializers.SerializerMethodField()
     
     class Meta:
@@ -23,7 +23,7 @@ class ServiceProviderSerializer(serializers.ModelSerializer):
         fields = ['id', 'user', 'user_name', 'user_email', 'is_primary', 'is_active']
 
 
-class ServiceSerializer(TenantFilteredSerializer, TimeFieldsMixin, CountSerializerMixin):
+class ServiceSerializer(TenantFilteredSerializer, DisplayFieldsMixin):
     category_name = serializers.CharField(source='category.name', read_only=True)
     providers = ServiceProviderSerializer(many=True, read_only=True)
     providers_count = serializers.SerializerMethodField()
@@ -77,9 +77,8 @@ class ServiceUpdateSerializer(TenantFilteredSerializer):
         read_only_fields = ['business']
 
 
-class ServiceListSerializer(serializers.ModelSerializer, CountSerializerMixin):
+class ServiceListSerializer(serializers.ModelSerializer, DisplayFieldsMixin):
     category_name = serializers.CharField(source='category.name', read_only=True)
-    duration_display = serializers.ReadOnlyField()
     providers_count = serializers.SerializerMethodField()
     
     class Meta:

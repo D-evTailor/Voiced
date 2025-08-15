@@ -186,16 +186,3 @@ class TimeCalculationMixin(models.Model):
     def duration_display(self):
         duration = getattr(self, 'duration', None)
         return format_duration(duration)
-
-# Legacy aliases for backward compatibility
-UUIDMixin = BaseFieldsMixin
-TimestampMixin = BaseFieldsMixin
-VersionMixin = AuditFieldsMixin
-ActiveMixin = BaseFieldsMixin
-
-class AuditMixin(BaseFieldsMixin, AuditFieldsMixin):
-    class Meta:
-        abstract = True
-
-CountMixin = BusinessStatsMixin
-ClientStatsMixin = BusinessStatsMixin

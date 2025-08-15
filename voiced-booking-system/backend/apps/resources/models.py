@@ -1,7 +1,7 @@
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from apps.core.mixins import BaseModel, TimestampMixin
+from apps.core.mixins import BaseModel, BaseFieldsMixin
 from apps.core.managers import TenantManager
 from apps.core.utils import RESOURCE_TYPE_CHOICES
 
@@ -118,7 +118,7 @@ class ServiceResource(models.Model):
         return f"{self.service.name} -> {self.resource.name} (x{self.quantity_required})"
 
 
-class AppointmentResource(TimestampMixin):
+class AppointmentResource(BaseFieldsMixin):
     appointment = models.ForeignKey('appointments.Appointment', on_delete=models.CASCADE, related_name='appointment_resources')
     resource = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name='appointment_resources')
     allocated_start = models.DateTimeField(_('allocated start'))

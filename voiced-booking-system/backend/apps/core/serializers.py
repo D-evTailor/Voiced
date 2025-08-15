@@ -14,23 +14,15 @@ class BaseSerializerMixin:
         return ('id', 'created_at', 'updated_at', 'created_by', 'updated_by', 'business', 'deleted_at', 'deleted_by')
 
 
-class UserFieldsMixin:
-    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
-    user_email = serializers.EmailField(source='user.email', read_only=True)
-
-
 class DisplayFieldsMixin:
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     type_display = serializers.CharField(source='get_type_display', read_only=True)
     role_display = serializers.CharField(source='get_role_display', read_only=True)
-
-
-class TimeFieldsMixin:
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    user_email = serializers.EmailField(source='user.email', read_only=True)
     end_time = serializers.ReadOnlyField()
     duration_display = serializers.ReadOnlyField()
-
-
-class CountSerializerMixin:
+    
     def get_active_count(self, obj, relation_name):
         return getattr(obj, relation_name).filter(is_active=True).count()
 
@@ -59,20 +51,3 @@ class TenantFilteredSerializer(BaseSerializer):
     def update(self, instance, validated_data):
         validated_data['updated_by'] = self.context['request'].user
         return super().update(instance, validated_data)
-
-
-class AuditSerializer(serializers.ModelSerializer, BaseSerializerMixin):
-    action_display = serializers.CharField(source='get_action_display', read_only=True)
-    user_email = serializers.EmailField(read_only=True)
-    
-    class Meta:
-        fields = '__all__'
-        read_only_fields = '__all__'
-
-
-class MetricsSerializer(serializers.ModelSerializer, BaseSerializerMixin):
-    metric_type_display = serializers.CharField(source='get_metric_type_display', read_only=True)
-    
-    class Meta:
-        fields = '__all__'
-        read_only_fields = '__all__'

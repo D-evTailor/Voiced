@@ -151,15 +151,6 @@ class FunctionCallHandler(BaseCallEventHandler):
             
             return {'error': 'Fecha requerida'}
         
-        # Legacy support
-        elif function_name == 'check_availability':
-            service = AvailabilityQueryService(call.business)
-            return service.check_availability(
-                self._find_service_id_by_name(call.business, parameters.get('service_name', '')),
-                parameters.get('date'),
-                None
-            )
-        
         else:
             raise ValueError(f"Unknown function: {function_name}")
     

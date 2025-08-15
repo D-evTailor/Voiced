@@ -1,12 +1,12 @@
 from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from apps.core.mixins import BusinessModel, TimestampMixin, CountMixin
+from apps.core.mixins import BusinessModel, BaseFieldsMixin, BusinessStatsMixin
 from apps.core.utils import PHONE_REGEX_VALIDATOR
 from apps.core.choices import CURRENCY_CHOICES, BUSINESS_TYPE_CHOICES, LANGUAGE_CHOICES
 
 
-class Business(BusinessModel, CountMixin):
+class Business(BusinessModel, BusinessStatsMixin):
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -101,7 +101,7 @@ class BusinessHours(models.Model):
         return not self.is_closed and self.open_time and self.close_time
 
 
-class BusinessMember(TimestampMixin):
+class BusinessMember(BaseFieldsMixin):
     ROLE_CHOICES = [
         ('owner', _('Owner')),
         ('admin', _('Administrator')),

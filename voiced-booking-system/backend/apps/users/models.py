@@ -4,7 +4,7 @@ from django.core.validators import EmailValidator
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from apps.core.mixins import TimestampMixin, SimpleModel
+from apps.core.mixins import BaseFieldsMixin, SimpleModel
 from apps.core.choices import LANGUAGE_CHOICES
 
 
@@ -72,7 +72,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.get_full_name()
 
 
-class UserProfile(TimestampMixin):
+class UserProfile(BaseFieldsMixin):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     phone = models.CharField(_('phone number'), max_length=20, blank=True)
     avatar = models.ImageField(_('avatar'), upload_to='avatars/', blank=True, null=True)
