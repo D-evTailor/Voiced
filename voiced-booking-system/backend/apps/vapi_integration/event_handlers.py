@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any
-from .value_objects import VapiEventType, CallAnalysisData, AppointmentBookingData
+from .value_objects import VapiEventType, CallAnalysisData
 from .models import VapiCall
 import logging
 
@@ -51,11 +51,66 @@ class CallEndedHandler(EventHandler):
         return {'action': 'no_appointment_data'}
 
 
+class ToolCallHandler(EventHandler):
+    def can_handle(self, event_type: VapiEventType) -> bool:
+        return event_type.is_tool_call
+    
+    def handle(self, call: VapiCall, event_data: Dict[str, Any]) -> Dict[str, Any]:
+        tool_call = event_data.get('tool_call', {})
+        tool_name = tool_call.get('function', {}).get('name', '')
+        
+        logger.info(f"Tool call received: {tool_name} for call {call.call_id}")
+        
+        from .domain_services import AvailabilityQueryService
+        service = AvailabilityQueryService(call.business)
+        
+        if tool_name == 'get_available_services':
+            result = service.get_available_services()
+            return {'action': 'tool_response', 'result': result}
+        
+        elif tool_name == 'check_availability':
+            params = tool_call.get('function', {}).get('arguments', {})
+            result = service.check_availability(
+                params.get('service_id'),
+                params.get('date'),
+                params.get('duration')
+            )
+            return {'action': 'tool_response', 'result': result}
+        
+        return {'action': 'unknown_tool', 'tool_name': tool_name}
+
+
+class AssistantRequestHandler(EventHandler):
+    def can_handle(self, event_type: VapiEventType) -> bool:
+        return event_type.is_assistant_request
+    
+    def handle(self, call: VapiCall, event_data: Dict[str, Any]) -> Dict[str, Any]:
+        phone_number = event_data.get('call', {}).get('from', {}).get('phoneNumber', '')
+        
+        logger.info(f"Assistant request for phone: {phone_number}")
+        
+        config = call.business.vapi_configurations.filter(is_active=True).first()
+        if not config:
+            return {'action': 'error', 'message': 'No configuration found'}
+        
+        return {
+            'action': 'assistant_response',
+            'assistant': {
+                'firstMessage': f'Hola, soy el asistente de {call.business.name}. ¿En qué puedo ayudarte?',
+                'voice': {'provider': 'openai', 'voiceId': 'nova'},
+                'model': {'provider': 'openai', 'model': 'gpt-4o-mini'},
+                'serverUrl': config.server_url
+            }
+        }
+
+
 class EventHandlerRegistry:
     def __init__(self):
         self._handlers = [
             CallStartedHandler(),
-            CallEndedHandler()
+            CallEndedHandler(),
+            ToolCallHandler(),
+            AssistantRequestHandler()
         ]
     
     def handle_event(self, event_type: VapiEventType, call: VapiCall, event_data: Dict[str, Any]) -> Dict[str, Any]:

@@ -6,7 +6,7 @@ from apps.services.models import Service
 from apps.appointments.models import Appointment
 from apps.clients.models import Client
 from .value_objects import AppointmentBookingData
-from .optimizations import cached_method, circuit_breaker, cache_service
+from .optimizations import cached_method, circuit_breaker, cache_service, VapiCacheKeys
 import logging
 
 logger = logging.getLogger(__name__)
@@ -102,15 +102,15 @@ class AppointmentBookingDomainService:
     
     def _invalidate_availability_cache(self, service: Service, start_time: datetime):
         date_str = start_time.date().isoformat()
-        cache_key = cache_service.get_availability_key(self.business.id, service.id, date_str)
-        cache_service.invalidate_pattern(f"vapi_availability:{self.business.id}:{service.id}:*")
+        cache_key = VapiCacheKeys.availability(self.business.id, service.id, date_str)
+        cache_service.invalidate_pattern(f"vapi:availability:{self.business.id}:{service.id}:*")
 
 
 class AvailabilityQueryService:
     def __init__(self, business):
         self.business = business
     
-    @cached_method(timeout=600, key_func=lambda self: cache_service.get_services_key(self.business.id))
+    @cached_method(timeout=600, key_func=lambda self: VapiCacheKeys.services(self.business.id))
     def get_available_services(self) -> List[Dict]:
         return list(Service.objects.filter(
             business=self.business,
@@ -126,7 +126,7 @@ class AvailabilityQueryService:
             date_obj = datetime.fromisoformat(date).date()
             duration_minutes = duration or service.duration
             
-            cache_key = cache_service.get_availability_key(self.business.id, service_id, date)
+            cache_key = VapiCacheKeys.availability(self.business.id, service_id, date)
             slots = cache_service.get_or_set(
                 cache_key,
                 lambda: self._find_available_slots(service, date_obj, duration_minutes),

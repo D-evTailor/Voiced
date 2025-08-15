@@ -2,7 +2,7 @@ from typing import Optional
 from django.core.cache import cache
 from django.http import HttpRequest
 from .value_objects import WebhookSignature
-from .optimizations import cached_method, cache_service
+from .optimizations import cached_method, cache_service, VapiCacheKeys
 import hashlib
 import hmac
 import logging
@@ -47,7 +47,7 @@ class WebhookRateLimiter:
         self.window_seconds = window_seconds
     
     def is_allowed(self, identifier: str) -> bool:
-        cache_key = f"vapi_webhook_rate_limit:{identifier}"
+        cache_key = f"vapi:rate_limit:{identifier}"
         current_count = cache.get(cache_key, 0)
         
         if current_count >= self.max_requests:
@@ -63,7 +63,7 @@ class WebhookSecurityManager:
         self.business = business
         self.rate_limiter = WebhookRateLimiter()
     
-    @cached_method(timeout=600, key_func=lambda self: cache_service.get_business_config_key(self.business.id))
+    @cached_method(timeout=600, key_func=lambda self: VapiCacheKeys.business_config(self.business.id))
     def _get_security_service(self) -> Optional[VapiSecurityService]:
         try:
             config = self.business.vapi_configurations.filter(is_active=True).first()

@@ -23,6 +23,18 @@ class WebhookProcessor:
                 result = self.event_registry.handle_event(event_type, call, webhook_data)
                 
                 logger.info(f"Processed {event_type.value} event for call {call.call_id}")
+                
+                if result.get('action') == 'tool_response':
+                    return {
+                        'status': 'success',
+                        'tool_response': result.get('result')
+                    }
+                elif result.get('action') == 'assistant_response':
+                    return {
+                        'status': 'success',
+                        'assistant': result.get('assistant')
+                    }
+                
                 return {
                     'status': 'success',
                     'call_id': call.call_id,

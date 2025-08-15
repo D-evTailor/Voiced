@@ -1,52 +1,28 @@
 from functools import wraps
 from typing import Any, Callable, Optional
 from django.core.cache import cache
-from django.conf import settings
 import time
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-class CircuitBreaker:
-    def __init__(self, failure_threshold: int = 5, recovery_timeout: int = 60, expected_exception: type = Exception):
-        self.failure_threshold = failure_threshold
-        self.recovery_timeout = recovery_timeout
-        self.expected_exception = expected_exception
-        self.failure_count = 0
-        self.last_failure_time = None
-        self.state = 'CLOSED'
+class VapiCacheKeys:
+    @staticmethod
+    def business_config(business_id: int) -> str:
+        return f"vapi:config:{business_id}"
     
-    def __call__(self, func: Callable) -> Callable:
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            if self.state == 'OPEN':
-                if time.time() - self.last_failure_time > self.recovery_timeout:
-                    self.state = 'HALF_OPEN'
-                else:
-                    logger.warning(f"Circuit breaker OPEN for {func.__name__}")
-                    raise Exception(f"Circuit breaker is OPEN for {func.__name__}")
-            
-            try:
-                result = func(*args, **kwargs)
-                self._on_success()
-                return result
-            except self.expected_exception as e:
-                self._on_failure()
-                raise e
-        
-        return wrapper
+    @staticmethod
+    def services(business_id: int) -> str:
+        return f"vapi:services:{business_id}"
     
-    def _on_success(self):
-        self.failure_count = 0
-        self.state = 'CLOSED'
+    @staticmethod
+    def availability(business_id: int, service_id: int, date: str) -> str:
+        return f"vapi:availability:{business_id}:{service_id}:{date}"
     
-    def _on_failure(self):
-        self.failure_count += 1
-        self.last_failure_time = time.time()
-        if self.failure_count >= self.failure_threshold:
-            self.state = 'OPEN'
-            logger.error(f"Circuit breaker opened after {self.failure_count} failures")
+    @staticmethod
+    def business_pattern(business_id: int) -> str:
+        return f"vapi:*:{business_id}:*"
 
 
 class CacheService:
@@ -66,14 +42,34 @@ class CacheService:
         else:
             cache.clear()
     
-    def get_business_config_key(self, business_id: int) -> str:
-        return f"vapi_config:{business_id}"
+    def invalidate_business_cache(self, business_id: int):
+        self.invalidate_pattern(VapiCacheKeys.business_pattern(business_id))
+
+
+class CircuitBreaker:
+    def __init__(self, max_failures: int = 3):
+        self.max_failures = max_failures
+        self.failure_count = 0
+        self.is_open = False
     
-    def get_services_key(self, business_id: int) -> str:
-        return f"vapi_services:{business_id}"
-    
-    def get_availability_key(self, business_id: int, service_id: int, date: str) -> str:
-        return f"vapi_availability:{business_id}:{service_id}:{date}"
+    def __call__(self, func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if self.is_open and self.failure_count >= self.max_failures:
+                logger.warning(f"Circuit breaker OPEN for {func.__name__}")
+                raise Exception(f"Service temporarily unavailable")
+            
+            try:
+                result = func(*args, **kwargs)
+                self.failure_count = 0
+                self.is_open = False
+                return result
+            except Exception as e:
+                self.failure_count += 1
+                if self.failure_count >= self.max_failures:
+                    self.is_open = True
+                raise e
+        return wrapper
 
 
 def cached_method(timeout: int = 300, key_func: Optional[Callable] = None):
@@ -83,7 +79,7 @@ def cached_method(timeout: int = 300, key_func: Optional[Callable] = None):
             if key_func:
                 cache_key = key_func(self, *args, **kwargs)
             else:
-                cache_key = f"{self.__class__.__name__}:{func.__name__}:{hash(str(args) + str(kwargs))}"
+                cache_key = f"{func.__name__}:{hash(str(args) + str(kwargs))}"
             
             result = cache.get(cache_key)
             if result is None:
@@ -94,5 +90,5 @@ def cached_method(timeout: int = 300, key_func: Optional[Callable] = None):
     return decorator
 
 
-circuit_breaker = CircuitBreaker()
 cache_service = CacheService()
+circuit_breaker = CircuitBreaker()

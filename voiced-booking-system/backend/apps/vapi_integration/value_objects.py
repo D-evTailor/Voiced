@@ -49,6 +49,14 @@ class VapiEventType:
     @property
     def is_call_started(self) -> bool:
         return self.value == 'call.started'
+    
+    @property
+    def is_tool_call(self) -> bool:
+        return self.value == 'tool-calls'
+    
+    @property
+    def is_assistant_request(self) -> bool:
+        return self.value == 'assistant-request'
 
 
 @dataclass(frozen=True)

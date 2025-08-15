@@ -2,7 +2,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from apps.core.mixins import BaseModel, SimpleModel
 from apps.core.choices import VAPI_CALL_STATUS_CHOICES, VAPI_CALL_TYPE_CHOICES, VAPI_ENDED_REASON_CHOICES, LANGUAGE_CHOICES
-from .cache_manager import VapiCacheManager
+from .optimizations import cache_service, VapiCacheKeys
 
 
 class VapiConfiguration(BaseModel):
@@ -10,8 +10,9 @@ class VapiConfiguration(BaseModel):
     assistant_id = models.CharField(_('assistant ID'), max_length=255)
     assistant_name = models.CharField(_('assistant name'), max_length=100, default='Booking Assistant')
     language = models.CharField(_('language'), max_length=10, choices=LANGUAGE_CHOICES, default='es')
-    server_url = models.URLField(_('server URL'), blank=True)
-    server_secret = models.CharField(_('server secret'), max_length=255, blank=True)
+    server_url = models.URLField(_('server URL'))
+    server_secret = models.CharField(_('server secret'), max_length=255)
+    webhook_timeout = models.IntegerField(_('webhook timeout (ms)'), default=7500)
     
     class Meta:
         verbose_name = _('Vapi Configuration')
@@ -26,12 +27,12 @@ class VapiConfiguration(BaseModel):
     
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        VapiCacheManager.invalidate_config_cache(self.business_id)
+        cache_service.invalidate_pattern(VapiCacheKeys.business_config(self.business_id))
     
     def delete(self, *args, **kwargs):
         business_id = self.business_id
         super().delete(*args, **kwargs)
-        VapiCacheManager.invalidate_config_cache(business_id)
+        cache_service.invalidate_pattern(VapiCacheKeys.business_config(business_id))
 
 
 class VapiCall(SimpleModel):

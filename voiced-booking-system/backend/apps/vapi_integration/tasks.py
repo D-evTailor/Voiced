@@ -56,43 +56,6 @@ def process_call_completion(call_id):
         return f"Error processing call {call_id}: {str(e)}"
 
 
-def get_or_create_client_from_call(call):
-    phone = call.customer_number
-    business = call.business
-    
-    if phone:
-        try:
-            client, created = Client.objects.select_related('business').get_or_create(
-                business=business,
-                phone=phone,
-                defaults={
-                    'name': call.analysis.structured_data.get('client_name', 'Unknown'),
-                    'email': call.analysis.structured_data.get('client_email', ''),
-                    'source': 'vapi'
-                }
-            )
-            if created:
-                logger.info(f"Created new client {client.id} for phone {phone}")
-            return client
-        except Exception as e:
-            logger.error(f"Error creating client for phone {phone}: {e}")
-    
-    return None
-
-
-@shared_task
-def sync_vapi_calls_status():
-    from datetime import timedelta
-    
-    pending_calls = VapiCall.objects.select_related('business').filter(
-        status__in=['queued', 'ringing', 'in_progress'],
-        created_at__gte=timezone.now() - timedelta(hours=24)
-    )
-    
-    logger.info(f"Found {pending_calls.count()} pending calls to sync")
-    return f"Synced {pending_calls.count()} calls"
-
-
 @shared_task
 def cleanup_old_call_data():
     from datetime import timedelta
