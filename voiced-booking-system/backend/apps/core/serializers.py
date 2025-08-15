@@ -4,6 +4,24 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 
+class BaseBusinessFieldsMixin:
+    name = serializers.CharField(max_length=200)
+    business_type = serializers.ChoiceField(choices=[])
+    email = serializers.EmailField()
+    phone = serializers.CharField(max_length=17)
+    address = serializers.CharField(required=False, allow_blank=True)
+    city = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    state = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    postal_code = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    country = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if hasattr(self, 'fields') and 'business_type' in self.fields:
+            from apps.core.choices import BUSINESS_TYPE_CHOICES
+            self.fields['business_type'].choices = BUSINESS_TYPE_CHOICES
+
+
 class BaseSerializerMixin:
     created_by = serializers.StringRelatedField(read_only=True)
     updated_by = serializers.StringRelatedField(read_only=True)

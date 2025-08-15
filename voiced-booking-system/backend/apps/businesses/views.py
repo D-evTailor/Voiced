@@ -39,9 +39,6 @@ class BusinessViewSet(OptimizedViewSetMixin, BaseViewSet):
             return BusinessUpdateSerializer
         return BusinessSerializer
     
-    def perform_create(self, serializer):
-        serializer.save(owner=self.request.user)
-    
     @action(detail=False, methods=['get'])
     def my_businesses(self, request):
         businesses = self.get_queryset()

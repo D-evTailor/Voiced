@@ -8,9 +8,16 @@ from apps.vapi_integration.tasks import register_tenant_async
 
 class BusinessRegistrationService:
     @transaction.atomic
-    def create_user_with_business(self, user_data, business_data):
-        user = User.objects.create_user(**user_data)
+    def create_business(self, user=None, user_data=None, business_data=None, is_primary=True):
+        if user_data and not user:
+            user = User.objects.create_user(**user_data)
+        elif not user:
+            raise ValueError("Either user or user_data must be provided")
         
+        if not business_data:
+            raise ValueError("business_data is required")
+            
+        business_data = business_data.copy()
         business_data['slug'] = self._generate_unique_slug(business_data['name'])
         business_data['owner'] = user
         business = Business.objects.create(**business_data)
@@ -19,34 +26,15 @@ class BusinessRegistrationService:
             business=business,
             user=user,
             role='owner',
-            is_primary=True,
+            is_primary=is_primary,
             is_active=True
         )
         
         business.onboarding_status.mark_step_completed('basic_info')
-        
         register_tenant_async.delay(business.id)
         
-        return user, business
-    
-    @transaction.atomic
-    def create_additional_business(self, user, business_data):
-        business_data['slug'] = self._generate_unique_slug(business_data['name'])
-        business_data['owner'] = user
-        business = Business.objects.create(**business_data)
-        
-        BusinessMember.objects.create(
-            business=business,
-            user=user,
-            role='owner',
-            is_primary=False,
-            is_active=True
-        )
-        
-        business.onboarding_status.mark_step_completed('basic_info')
-        
-        register_tenant_async.delay(business.id)
-        
+        if user_data:
+            return user, business
         return business
     
     def _generate_unique_slug(self, name):

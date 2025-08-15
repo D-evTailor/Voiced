@@ -1,24 +1,18 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from apps.core.serializers import BaseSerializer
-from apps.core.choices import BUSINESS_TYPE_CHOICES
+from apps.core.serializers import BaseSerializer, BaseBusinessFieldsMixin
 from .models import UserProfile
 
 User = get_user_model()
 
 
-class UserBusinessRegistrationSerializer(serializers.Serializer):
+class UserBusinessRegistrationSerializer(BaseBusinessFieldsMixin, serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8)
     first_name = serializers.CharField(max_length=150)
     last_name = serializers.CharField(max_length=150)
     locale = serializers.CharField(max_length=10, default='es')
     timezone = serializers.CharField(max_length=50, default='Europe/Madrid')
-    
-    business_name = serializers.CharField(max_length=200)
-    business_type = serializers.ChoiceField(choices=BUSINESS_TYPE_CHOICES, default='other')
-    business_email = serializers.EmailField()
-    business_phone = serializers.CharField(max_length=17)
     
     def validate(self, attrs):
         if User.objects.filter(email=attrs['email']).exists():
@@ -38,14 +32,19 @@ class UserBusinessRegistrationSerializer(serializers.Serializer):
         }
         
         business_data = {
-            'name': validated_data['business_name'],
+            'name': validated_data['name'],
             'business_type': validated_data['business_type'],
-            'email': validated_data['business_email'],
-            'phone': validated_data['business_phone'],
+            'email': validated_data['email'],
+            'phone': validated_data['phone'],
+            'address': validated_data.get('address', ''),
+            'city': validated_data.get('city', ''),
+            'state': validated_data.get('state', ''),
+            'postal_code': validated_data.get('postal_code', ''),
+            'country': validated_data.get('country', ''),
         }
         
         service = BusinessRegistrationService()
-        user, business = service.create_user_with_business(user_data, business_data)
+        user, business = service.create_business(user_data=user_data, business_data=business_data)
         
         return {'user': user, 'business': business}
 

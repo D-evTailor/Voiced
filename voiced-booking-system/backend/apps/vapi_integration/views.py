@@ -39,40 +39,6 @@ class VapiConfigurationViewSet(viewsets.ModelViewSet):
         business = get_object_or_404(Business, id=business_id)
         serializer.save(business=business)
     
-    @action(detail=False, methods=['post'])
-    def register_tenant(self, request):
-        from .multi_tenant_services import TenantRegistrationService
-        
-        business_id = request.data.get('business_id')
-        if not business_id:
-            return Response({
-                'error': 'Business ID is required'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        try:
-            business = Business.objects.get(id=business_id)
-            service = TenantRegistrationService()
-            result = service.register_tenant(
-                business=business,
-                area_code=request.data.get('area_code')
-            )
-            
-            if result['success']:
-                logger.info(f"Tenant registered successfully: {business.name}")
-                return Response(result)
-            else:
-                return Response(result, status=status.HTTP_400_BAD_REQUEST)
-                
-        except Business.DoesNotExist:
-            return Response({
-                'error': 'Business not found'
-            }, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            logger.error(f"Tenant registration failed: {e}")
-            return Response({
-                'error': str(e)
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
     @action(detail=False, methods=['get'])
     def usage_metrics(self, request):
         """Get usage metrics for billing purposes"""

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from apps.core.serializers import TenantFilteredSerializer, DisplayFieldsMixin
+from apps.core.serializers import TenantFilteredSerializer, DisplayFieldsMixin, BaseBusinessFieldsMixin
 from .models import Business, BusinessHours, BusinessMember
 
 
@@ -22,7 +22,7 @@ class BusinessListSerializer(serializers.ModelSerializer):
         return member.is_primary if member else False
 
 
-class AdditionalBusinessSerializer(serializers.ModelSerializer):
+class AdditionalBusinessSerializer(BaseBusinessFieldsMixin, serializers.ModelSerializer):
     class Meta:
         model = Business
         fields = ['name', 'business_type', 'email', 'phone', 'address', 'city', 'state', 'postal_code', 'country']
@@ -31,7 +31,7 @@ class AdditionalBusinessSerializer(serializers.ModelSerializer):
         from .services import BusinessRegistrationService
         user = self.context['request'].user
         service = BusinessRegistrationService()
-        return service.create_additional_business(user, validated_data)
+        return service.create_business(user=user, business_data=validated_data, is_primary=False)
 
 
 class BusinessHoursSerializer(serializers.ModelSerializer):
@@ -67,32 +67,25 @@ class BusinessSerializer(serializers.ModelSerializer, DisplayFieldsMixin):
         return self.get_active_count(obj, 'members')
 
 
-class BusinessCreateSerializer(serializers.ModelSerializer):
-    business_hours = BusinessHoursSerializer(many=True, required=False)
-    
+class BusinessCreateSerializer(BaseBusinessFieldsMixin, serializers.ModelSerializer):
     class Meta:
         model = Business
         fields = ['name', 'slug', 'description', 'email', 'phone', 'website', 'address', 
                  'city', 'state', 'postal_code', 'country', 'locale', 'timezone', 'currency',
                  'allow_online_booking', 'allow_voice_booking', 'require_approval', 
-                 'logo', 'primary_color', 'business_hours']
+                 'logo', 'primary_color', 'business_type']
     
     def create(self, validated_data):
-        from apps.core.factories import BusinessHoursFactory, BusinessMemberFactory
-        
-        business_hours_data = validated_data.pop('business_hours', [])
-        business = super().create(validated_data)
-        
-        BusinessHoursFactory.create_business_hours(business, business_hours_data)
-        BusinessMemberFactory.create_owner_membership(business)
-        
-        return business
+        from .services import BusinessRegistrationService
+        user = self.context['request'].user
+        service = BusinessRegistrationService()
+        return service.create_business(user=user, business_data=validated_data, is_primary=False)
 
 
-class BusinessUpdateSerializer(serializers.ModelSerializer):
+class BusinessUpdateSerializer(BaseBusinessFieldsMixin, serializers.ModelSerializer):
     class Meta:
         model = Business
         fields = ['name', 'description', 'email', 'phone', 'website', 'address',
                  'city', 'state', 'postal_code', 'country', 'timezone', 'currency',
                  'allow_online_booking', 'allow_voice_booking', 'require_approval',
-                 'logo', 'primary_color']
+                 'logo', 'primary_color', 'business_type']
