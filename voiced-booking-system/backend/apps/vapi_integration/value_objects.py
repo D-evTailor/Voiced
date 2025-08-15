@@ -34,29 +34,51 @@ class WebhookSignature:
 class VapiEventType:
     value: str
     
+    VALID_EVENTS = {
+        'assistant-request',
+        'function-call', 
+        'tool-calls',
+        'call-started',
+        'call-ended',
+        'speech-started',
+        'speech-ended',
+        'transcript',
+        'hang',
+        'status-update',
+        'end-of-call-report'
+    }
+    
     def __post_init__(self):
-        valid_events = {
-            'call.started', 'call.ended', 'call.failed',
-            'tool-calls', 'assistant-request'
-        }
-        if self.value not in valid_events:
+        if self.value not in self.VALID_EVENTS:
             raise ValueError(f"Invalid event type: {self.value}")
     
     @property
     def is_call_ended(self) -> bool:
-        return self.value == 'call.ended'
+        return self.value == 'call-ended'
     
     @property
     def is_call_started(self) -> bool:
-        return self.value == 'call.started'
+        return self.value == 'call-started'
     
     @property
-    def is_tool_call(self) -> bool:
-        return self.value == 'tool-calls'
+    def is_function_call(self) -> bool:
+        return self.value in ('function-call', 'tool-calls')
     
     @property
     def is_assistant_request(self) -> bool:
         return self.value == 'assistant-request'
+    
+    @property
+    def is_speech_event(self) -> bool:
+        return self.value in ('speech-started', 'speech-ended')
+    
+    @property
+    def is_transcript(self) -> bool:
+        return self.value == 'transcript'
+    
+    @property
+    def is_end_of_call_report(self) -> bool:
+        return self.value == 'end-of-call-report'
 
 
 @dataclass(frozen=True)

@@ -1,8 +1,7 @@
 from celery import shared_task
 from django.utils import timezone
-from .models import VapiCall, VapiAppointmentIntegration
+from .models import VapiCall, VapiAppointmentIntegration, VapiCallAnalysis
 from apps.appointments.models import Appointment
-from apps.clients.models import Client
 from .domain_services import CallAnalysisDomainService, AppointmentBookingDomainService
 import logging
 
@@ -57,6 +56,35 @@ def process_call_completion(call_id):
 
 
 @shared_task
+def process_call_analysis(call_id, analysis_data):
+    try:
+        call = VapiCall.objects.get(id=call_id)
+        
+        analysis, created = VapiCallAnalysis.objects.update_or_create(
+            call=call,
+            defaults={
+                'summary': analysis_data.get('summary', ''),
+                'structured_data': analysis_data.get('structuredData', {}),
+                'success_evaluation': analysis_data.get('successEvaluation', ''),
+            }
+        )
+        
+        if created:
+            logger.info(f"Created analysis for call {call.call_id}")
+        else:
+            logger.info(f"Updated analysis for call {call.call_id}")
+        
+        return f"Analysis processed for call {call.call_id}"
+        
+    except VapiCall.DoesNotExist:
+        logger.error(f"Call {call_id} not found for analysis")
+        return f"Call {call_id} not found"
+    except Exception as e:
+        logger.error(f"Error processing analysis for call {call_id}: {e}")
+        return f"Error processing analysis: {str(e)}"
+
+
+@shared_task
 def cleanup_old_call_data():
     from datetime import timedelta
     
@@ -70,3 +98,23 @@ def cleanup_old_call_data():
     
     logger.info(f"Cleaned up {count} old calls")
     return f"Cleaned up {count} old calls"
+
+
+@shared_task
+def sync_vapi_assistants():
+    from .api_client import VapiAPIClient
+    from .models import VapiConfiguration
+    
+    client = VapiAPIClient()
+    synced_count = 0
+    
+    for config in VapiConfiguration.objects.filter(is_active=True):
+        try:
+            if config.assistant_id:
+                assistant_data = client.get_assistant(config.assistant_id)
+                logger.info(f"Synced assistant {config.assistant_id} for business {config.business.name}")
+                synced_count += 1
+        except Exception as e:
+            logger.error(f"Failed to sync assistant for business {config.business.name}: {e}")
+    
+    return f"Synced {synced_count} assistants"

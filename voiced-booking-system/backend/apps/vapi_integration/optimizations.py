@@ -21,6 +21,10 @@ class VapiCacheKeys:
         return f"vapi:availability:{business_id}:{service_id}:{date}"
     
     @staticmethod
+    def assistant(business_id: int) -> str:
+        return f"vapi:assistant:{business_id}"
+    
+    @staticmethod
     def business_pattern(business_id: int) -> str:
         return f"vapi:*:{business_id}:*"
 

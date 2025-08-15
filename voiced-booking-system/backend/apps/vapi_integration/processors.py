@@ -16,7 +16,7 @@ class WebhookProcessor:
     
     def process_webhook(self, webhook_data: Dict) -> Dict:
         try:
-            event_type = VapiEventType(webhook_data.get('event'))
+            event_type = VapiEventType(webhook_data.get('message', {}).get('type', ''))
             
             with transaction.atomic():
                 call = self._save_call_data(webhook_data)
@@ -24,30 +24,36 @@ class WebhookProcessor:
                 
                 logger.info(f"Processed {event_type.value} event for call {call.call_id}")
                 
-                if result.get('action') == 'tool_response':
-                    return {
-                        'status': 'success',
-                        'tool_response': result.get('result')
-                    }
-                elif result.get('action') == 'assistant_response':
-                    return {
-                        'status': 'success',
-                        'assistant': result.get('assistant')
-                    }
-                
-                return {
-                    'status': 'success',
-                    'call_id': call.call_id,
-                    'event_processed': event_type.value,
-                    **result
-                }
+                return self._format_response(result, call, event_type)
                 
         except ValueError as e:
             logger.error(f"Invalid event type: {e}")
-            return {'status': 'error', 'error': str(e)}
+            return {'error': f'Invalid event type: {str(e)}'}
         except Exception as e:
             logger.error(f"Error processing webhook: {e}")
-            return {'status': 'error', 'error': str(e)}
+            return {'error': f'Processing failed: {str(e)}'}
+    
+    def _format_response(self, result: Dict, call: VapiCall, event_type: VapiEventType) -> Dict:
+        status = result.get('status', 'unknown')
+        
+        if status == 'function_executed':
+            return result.get('functionCall', {})
+        
+        elif status == 'assistant_provided':
+            if 'assistantId' in result:
+                return {'assistantId': result['assistantId']}
+            else:
+                return result.get('assistant', {})
+        
+        elif status in ('error', 'function_error'):
+            return {'error': result.get('error', 'Unknown error')}
+        
+        return {
+            'status': 'success',
+            'call_id': call.call_id,
+            'event': event_type.value,
+            'message': f'Event {event_type.value} processed successfully'
+        }
     
     def _save_call_data(self, webhook_data: Dict) -> VapiCall:
         serializer = VapiWebhookSerializer(

@@ -51,13 +51,15 @@ class VapiCallSerializer(serializers.ModelSerializer):
 
 
 class VapiWebhookSerializer(serializers.Serializer):
-    event = serializers.CharField()
-    call = serializers.DictField()
-    timestamp = serializers.DateTimeField()
+    message = serializers.DictField()
     
     def create(self, validated_data):
-        call_data = validated_data['call']
+        message_data = validated_data['message']
         business = self.context['business']
+        
+        call_data = message_data.get('call', {})
+        if not call_data:
+            raise serializers.ValidationError("Call data is required")
         
         try:
             call, created = VapiCall.objects.get_or_create(
@@ -68,14 +70,21 @@ class VapiWebhookSerializer(serializers.Serializer):
                     'type': call_data.get('type', ''),
                     'status': call_data.get('status', ''),
                     'ended_reason': call_data.get('endedReason', ''),
-                    'started_at': call_data.get('startedAt'),
-                    'ended_at': call_data.get('endedAt'),
+                    'started_at': self._parse_datetime(call_data.get('startedAt')),
+                    'ended_at': self._parse_datetime(call_data.get('endedAt')),
                     'cost': call_data.get('cost'),
                     'cost_breakdown': call_data.get('costBreakdown', {}),
                     'phone_number': call_data.get('phoneNumber', ''),
                     'customer_number': call_data.get('customer', {}).get('number', ''),
+                    'assistant_id': call_data.get('assistantId', ''),
+                    'squad_id': call_data.get('squadId', ''),
+                    'phone_call_provider': call_data.get('phoneCallProvider', ''),
+                    'phone_call_transport': call_data.get('phoneCallTransport', ''),
                 }
             )
+            
+            if not created:
+                self._update_call_fields(call, call_data)
             
             self._update_transcript(call, call_data)
             self._update_analysis(call, call_data)
@@ -90,6 +99,35 @@ class VapiWebhookSerializer(serializers.Serializer):
         except Exception as e:
             logger.error(f"Error creating/updating call {call_data.get('id')}: {e}")
             raise serializers.ValidationError(f"Error processing call data: {str(e)}")
+    
+    def _parse_datetime(self, dt_str):
+        if not dt_str:
+            return None
+        try:
+            from django.utils.dateparse import parse_datetime
+            return parse_datetime(dt_str)
+        except Exception:
+            return None
+    
+    def _update_call_fields(self, call, call_data):
+        update_fields = []
+        
+        for field, key in [
+            ('status', 'status'),
+            ('ended_reason', 'endedReason'),
+            ('cost', 'cost'),
+            ('ended_at', 'endedAt'),
+        ]:
+            if key in call_data:
+                value = call_data[key]
+                if field == 'ended_at':
+                    value = self._parse_datetime(value)
+                if getattr(call, field) != value:
+                    setattr(call, field, value)
+                    update_fields.append(field)
+        
+        if update_fields:
+            call.save(update_fields=update_fields)
     
     def _update_transcript(self, call, call_data):
         if call_data.get('transcript'):

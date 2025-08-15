@@ -12,10 +12,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class AppointmentBookingDomainService:
+class BaseBusinessService:
     def __init__(self, business):
         self.business = business
-    
+
+
+class AppointmentBookingDomainService(BaseBusinessService):
     @circuit_breaker
     def book_appointment(self, booking_data: AppointmentBookingData) -> Dict[str, any]:
         if not booking_data.is_valid:
@@ -102,14 +104,10 @@ class AppointmentBookingDomainService:
     
     def _invalidate_availability_cache(self, service: Service, start_time: datetime):
         date_str = start_time.date().isoformat()
-        cache_key = VapiCacheKeys.availability(self.business.id, service.id, date_str)
         cache_service.invalidate_pattern(f"vapi:availability:{self.business.id}:{service.id}:*")
 
 
-class AvailabilityQueryService:
-    def __init__(self, business):
-        self.business = business
-    
+class AvailabilityQueryService(BaseBusinessService):
     @cached_method(timeout=600, key_func=lambda self: VapiCacheKeys.services(self.business.id))
     def get_available_services(self) -> List[Dict]:
         return list(Service.objects.filter(
@@ -145,32 +143,53 @@ class AvailabilityQueryService:
             return {'available': False, 'error': 'Invalid date format'}
     
     def _find_available_slots(self, service: Service, date_obj, duration_minutes: int) -> List[str]:
-        start_time = timezone.datetime.combine(date_obj, timezone.datetime.min.time().replace(hour=9))
-        end_time = timezone.datetime.combine(date_obj, timezone.datetime.min.time().replace(hour=18))
+        business_hours = self._get_business_hours(date_obj)
+        if not business_hours:
+            return []
         
-        existing_appointments = Appointment.objects.filter(
+        start_time, end_time = business_hours
+        existing_appointments = self._get_existing_appointments(service, date_obj)
+        
+        return self._calculate_available_slots(start_time, end_time, duration_minutes, existing_appointments)
+    
+    def _get_business_hours(self, date_obj) -> Optional[tuple]:
+        day_of_week = date_obj.weekday()
+        hours = self.business.business_hours.filter(day_of_week=day_of_week, is_closed=False).first()
+        
+        if not hours or not hours.open_time or not hours.close_time:
+            return None
+        
+        start_time = timezone.datetime.combine(date_obj, hours.open_time)
+        end_time = timezone.datetime.combine(date_obj, hours.close_time)
+        
+        return start_time, end_time
+    
+    def _get_existing_appointments(self, service: Service, date_obj):
+        return Appointment.objects.filter(
             business=self.business,
             service=service,
             start_time__date=date_obj,
             status__in=['confirmed', 'in_progress']
         ).values_list('start_time', 'end_time')
-        
+    
+    def _calculate_available_slots(self, start_time, end_time, duration_minutes: int, existing_appointments) -> List[str]:
         slots = []
         current_time = start_time
         slot_duration = timedelta(minutes=duration_minutes)
+        slot_interval = timedelta(minutes=30)
         
         while current_time + slot_duration <= end_time:
             slot_end = current_time + slot_duration
             
             is_available = not any(
-                (current_time < end and slot_end > start)
-                for start, end in existing_appointments
+                (current_time < existing_end and slot_end > existing_start)
+                for existing_start, existing_end in existing_appointments
             )
             
             if is_available:
                 slots.append(current_time.isoformat())
             
-            current_time += timedelta(minutes=30)
+            current_time += slot_interval
         
         return slots
 

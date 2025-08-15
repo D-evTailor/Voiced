@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any
 from .value_objects import VapiEventType, CallAnalysisData
 from .models import VapiCall
+from .domain_services import AvailabilityQueryService, AppointmentBookingDomainService
+from .api_client import VapiBusinessService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,23 +19,28 @@ class EventHandler(ABC):
         pass
 
 
-class CallStartedHandler(EventHandler):
+class BaseCallEventHandler(EventHandler):
+    def _log_event(self, event_type: str, call: VapiCall, details: str = ""):
+        logger.info(f"{event_type} event for call {call.call_id} {details}")
+
+
+class CallStartedHandler(BaseCallEventHandler):
     def can_handle(self, event_type: VapiEventType) -> bool:
         return event_type.is_call_started
     
     def handle(self, call: VapiCall, event_data: Dict[str, Any]) -> Dict[str, Any]:
-        logger.info(f"Call started: {call.call_id}")
-        return {'action': 'call_started', 'call_id': call.call_id}
+        self._log_event("Call started", call)
+        return {'status': 'call_started', 'call_id': call.call_id}
 
 
-class CallEndedHandler(EventHandler):
+class CallEndedHandler(BaseCallEventHandler):
     def can_handle(self, event_type: VapiEventType) -> bool:
         return event_type.is_call_ended
     
     def handle(self, call: VapiCall, event_data: Dict[str, Any]) -> Dict[str, Any]:
         if not hasattr(call, 'analysis') or not call.analysis.structured_data:
-            logger.info(f"Call ended without analysis data: {call.call_id}")
-            return {'action': 'no_analysis_data'}
+            self._log_event("Call ended", call, "without analysis data")
+            return {'status': 'no_analysis_data'}
         
         analysis = CallAnalysisData.from_dict({
             'summary': call.analysis.summary,
@@ -44,64 +51,130 @@ class CallEndedHandler(EventHandler):
         if analysis.has_appointment_data:
             from .tasks import process_call_completion
             process_call_completion.delay(call.id)
-            logger.info(f"Scheduled appointment processing for call: {call.call_id}")
-            return {'action': 'scheduled_processing', 'call_id': call.call_id}
+            self._log_event("Call ended", call, "with appointment data - scheduled processing")
+            return {'status': 'scheduled_processing', 'call_id': call.call_id}
         
-        logger.info(f"Call ended without appointment data: {call.call_id}")
-        return {'action': 'no_appointment_data'}
+        self._log_event("Call ended", call, "without appointment data")
+        return {'status': 'no_appointment_data'}
 
 
-class ToolCallHandler(EventHandler):
+class FunctionCallHandler(BaseCallEventHandler):
     def can_handle(self, event_type: VapiEventType) -> bool:
-        return event_type.is_tool_call
+        return event_type.is_function_call
     
     def handle(self, call: VapiCall, event_data: Dict[str, Any]) -> Dict[str, Any]:
-        tool_call = event_data.get('tool_call', {})
-        tool_name = tool_call.get('function', {}).get('name', '')
+        function_call = event_data.get('functionCall', {})
+        function_name = function_call.get('name', '')
+        parameters = function_call.get('parameters', {})
         
-        logger.info(f"Tool call received: {tool_name} for call {call.call_id}")
+        self._log_event("Function call", call, f"- {function_name}")
         
-        from .domain_services import AvailabilityQueryService
-        service = AvailabilityQueryService(call.business)
+        try:
+            result = self._execute_function(call, function_name, parameters)
+            return {
+                'status': 'function_executed',
+                'result': result,
+                'functionCall': {
+                    'name': function_name,
+                    'result': result
+                }
+            }
+        except Exception as e:
+            logger.error(f"Function call failed for {function_name}: {e}")
+            return {
+                'status': 'function_error',
+                'error': str(e),
+                'functionCall': {
+                    'name': function_name,
+                    'error': str(e)
+                }
+            }
+    
+    def _execute_function(self, call: VapiCall, function_name: str, parameters: Dict) -> Any:
+        if function_name == 'get_available_services':
+            service = AvailabilityQueryService(call.business)
+            return service.get_available_services()
         
-        if tool_name == 'get_available_services':
-            result = service.get_available_services()
-            return {'action': 'tool_response', 'result': result}
-        
-        elif tool_name == 'check_availability':
-            params = tool_call.get('function', {}).get('arguments', {})
-            result = service.check_availability(
-                params.get('service_id'),
-                params.get('date'),
-                params.get('duration')
+        elif function_name == 'check_availability':
+            service = AvailabilityQueryService(call.business)
+            return service.check_availability(
+                parameters.get('service_id'),
+                parameters.get('date'),
+                parameters.get('duration')
             )
-            return {'action': 'tool_response', 'result': result}
         
-        return {'action': 'unknown_tool', 'tool_name': tool_name}
+        elif function_name == 'book_appointment':
+            booking_service = AppointmentBookingDomainService(call.business)
+            from .value_objects import AppointmentBookingData
+            
+            booking_data = AppointmentBookingData(
+                service_name=parameters.get('service_name', ''),
+                client_name=parameters.get('client_name', ''),
+                client_phone=parameters.get('client_phone', ''),
+                client_email=parameters.get('client_email', ''),
+                datetime_iso=parameters.get('datetime', ''),
+                notes=parameters.get('notes', '')
+            )
+            
+            return booking_service.book_appointment(booking_data)
+        
+        else:
+            raise ValueError(f"Unknown function: {function_name}")
 
 
-class AssistantRequestHandler(EventHandler):
+class AssistantRequestHandler(BaseCallEventHandler):
     def can_handle(self, event_type: VapiEventType) -> bool:
         return event_type.is_assistant_request
     
     def handle(self, call: VapiCall, event_data: Dict[str, Any]) -> Dict[str, Any]:
         phone_number = event_data.get('call', {}).get('from', {}).get('phoneNumber', '')
-        
-        logger.info(f"Assistant request for phone: {phone_number}")
+        self._log_event("Assistant request", call, f"from {phone_number}")
         
         config = call.business.vapi_configurations.filter(is_active=True).first()
         if not config:
-            return {'action': 'error', 'message': 'No configuration found'}
-        
-        return {
-            'action': 'assistant_response',
-            'assistant': {
-                'firstMessage': f'Hola, soy el asistente de {call.business.name}. ¿En qué puedo ayudarte?',
-                'voice': {'provider': 'openai', 'voiceId': 'nova'},
-                'model': {'provider': 'openai', 'model': 'gpt-4o-mini'},
-                'serverUrl': config.server_url
+            return {
+                'status': 'error',
+                'error': 'No active VAPI configuration found'
             }
-        }
+        
+        vapi_service = VapiBusinessService(call.business)
+        try:
+            assistant_id = vapi_service.get_or_create_assistant()
+            return {
+                'status': 'assistant_provided',
+                'assistantId': assistant_id,
+                'assistant': config.assistant_config
+            }
+        except Exception as e:
+            logger.error(f"Failed to get assistant for business {call.business.id}: {e}")
+            return {
+                'status': 'error',
+                'error': str(e)
+            }
+
+
+class TranscriptHandler(BaseCallEventHandler):
+    def can_handle(self, event_type: VapiEventType) -> bool:
+        return event_type.is_transcript
+    
+    def handle(self, call: VapiCall, event_data: Dict[str, Any]) -> Dict[str, Any]:
+        transcript_data = event_data.get('transcript', {})
+        self._log_event("Transcript", call, f"received")
+        
+        return {'status': 'transcript_processed'}
+
+
+class EndOfCallReportHandler(BaseCallEventHandler):
+    def can_handle(self, event_type: VapiEventType) -> bool:
+        return event_type.is_end_of_call_report
+    
+    def handle(self, call: VapiCall, event_data: Dict[str, Any]) -> Dict[str, Any]:
+        self._log_event("End of call report", call, "received")
+        
+        from .tasks import process_call_analysis
+        process_call_analysis.delay(call.id, event_data)
+        
+        return {'status': 'analysis_scheduled'}
 
 
 class EventHandlerRegistry:
@@ -109,8 +182,10 @@ class EventHandlerRegistry:
         self._handlers = [
             CallStartedHandler(),
             CallEndedHandler(),
-            ToolCallHandler(),
-            AssistantRequestHandler()
+            FunctionCallHandler(),
+            AssistantRequestHandler(),
+            TranscriptHandler(),
+            EndOfCallReportHandler(),
         ]
     
     def handle_event(self, event_type: VapiEventType, call: VapiCall, event_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -119,4 +194,4 @@ class EventHandlerRegistry:
                 return handler.handle(call, event_data)
         
         logger.warning(f"No handler found for event type: {event_type.value}")
-        return {'action': 'unhandled_event', 'event_type': event_type.value}
+        return {'status': 'unhandled_event', 'event_type': event_type.value}

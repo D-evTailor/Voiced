@@ -11,6 +11,7 @@ from .models import VapiConfiguration, VapiCall
 from .serializers import VapiConfigurationSerializer, VapiCallSerializer
 from .security import WebhookSecurityManager
 from .processors import WebhookProcessor
+from .api_client import VapiBusinessService
 from .value_objects import BusinessSlug
 import logging
 
@@ -34,6 +35,24 @@ class VapiConfigurationViewSet(viewsets.ModelViewSet):
         business_id = self.kwargs.get('business_id') or self.request.data.get('business_id')
         business = get_object_or_404(Business, id=business_id)
         serializer.save(business=business)
+    
+    @action(detail=True, methods=['post'])
+    def sync_assistant(self, request, pk=None):
+        config = self.get_object()
+        try:
+            service = VapiBusinessService(config.business)
+            assistant_id = service.get_or_create_assistant()
+            return Response({
+                'success': True,
+                'assistant_id': assistant_id,
+                'message': 'Assistant synced successfully'
+            })
+        except Exception as e:
+            logger.error(f"Assistant sync failed for business {config.business.id}: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
 
 
 class VapiCallViewSet(viewsets.ReadOnlyModelViewSet):
@@ -48,6 +67,38 @@ class VapiCallViewSet(viewsets.ReadOnlyModelViewSet):
                 'business', 'transcript', 'analysis'
             ).prefetch_related('appointment_integration__appointment')
         return VapiCall.objects.none()
+    
+    @action(detail=False, methods=['post'])
+    def make_outbound_call(self, request):
+        business_id = self.kwargs.get('business_id') or request.data.get('business_id')
+        business = get_object_or_404(Business, id=business_id)
+        
+        phone_number = request.data.get('phone_number')
+        if not phone_number:
+            return Response({
+                'error': 'Phone number is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            service = VapiBusinessService(business)
+            result = service.make_outbound_call(
+                phone_number=phone_number,
+                **request.data
+            )
+            
+            logger.info(f"Outbound call initiated for business {business.id} to {phone_number}")
+            return Response({
+                'success': True,
+                'call_id': result.get('id'),
+                'status': result.get('status'),
+                'message': 'Outbound call initiated successfully'
+            })
+        except Exception as e:
+            logger.error(f"Outbound call failed for business {business.id}: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=True, methods=['get'])
     def transcript(self, request, pk=None):
@@ -96,9 +147,9 @@ class VapiWebhookViewSet(viewsets.ViewSet):
         processor = WebhookProcessor(business)
         result = processor.process_webhook(request.data)
         
-        if result['status'] == 'success':
-            logger.info(f"Webhook processed successfully for business {business_slug.value}")
-            return Response(result, status=status.HTTP_200_OK)
-        else:
+        if 'error' in result:
             logger.error(f"Webhook processing failed for business {business_slug.value}: {result}")
             return Response(result, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            logger.info(f"Webhook processed successfully for business {business_slug.value}")
+            return Response(result, status=status.HTTP_200_OK)
