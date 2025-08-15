@@ -6,9 +6,10 @@ from django_filters.rest_framework import DjangoFilterBackend
 from .permissions import TenantPermission
 from .pagination import StandardResultsSetPagination
 from .serializers import TenantFilteredSerializer
+from .mixins import IdempotencyMixin, ResourceActionsMixin, CacheOptimizationMixin
 
 
-class BaseViewSet(viewsets.ModelViewSet):
+class BaseViewSet(IdempotencyMixin, ResourceActionsMixin, viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, TenantPermission]
     pagination_class = StandardResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -64,11 +65,12 @@ class TenantViewSet(BaseViewSet):
     serializer_class = TenantFilteredSerializer
 
 
-class ReadOnlyTenantViewSet(viewsets.ReadOnlyModelViewSet):
+class ReadOnlyTenantViewSet(CacheOptimizationMixin, viewsets.ReadOnlyModelViewSet):
     permission_classes = [permissions.IsAuthenticated, TenantPermission]
     pagination_class = StandardResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     ordering = ['-created_at']
+    cache_timeout = 600
     
     def get_queryset(self):
         return self.queryset.filter(business=self.request.business)

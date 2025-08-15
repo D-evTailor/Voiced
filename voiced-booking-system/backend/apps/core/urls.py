@@ -10,6 +10,7 @@ urlpatterns = [
     path('v1/businesses/', include('apps.businesses.urls')),
     path('v1/services/', include('apps.services.urls')),
     path('v1/appointments/', include('apps.appointments.urls')),
+    path('v1/clients/', include('apps.clients.urls')),
     path('v1/payments/', include('apps.payments.urls')),
     path('v1/vapi/', include('apps.vapi_integration.urls')),
     path('v1/notifications/', include('apps.notifications.urls')),

@@ -36,40 +36,6 @@ class BusinessViewSet(OptimizedViewSetMixin, BaseViewSet):
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
     
-    @action(detail=True, methods=['get', 'put'])
-    def hours(self, request, pk=None):
-        business = self.get_object()
-        
-        if request.method == 'GET':
-            hours = business.business_hours.all().order_by('day_of_week')
-            serializer = BusinessHoursSerializer(hours, many=True)
-            return success_response(data=serializer.data)
-        
-        elif request.method == 'PUT':
-            hours_data = request.data.get('hours', [])
-            for hour_data in hours_data:
-                day_of_week = hour_data.get('day_of_week')
-                hour_obj, created = BusinessHours.objects.get_or_create(
-                    business=business,
-                    day_of_week=day_of_week,
-                    defaults=hour_data
-                )
-                if not created:
-                    for attr, value in hour_data.items():
-                        setattr(hour_obj, attr, value)
-                    hour_obj.save()
-            
-            hours = business.business_hours.all().order_by('day_of_week')
-            serializer = BusinessHoursSerializer(hours, many=True)
-            return success_response(data=serializer.data, message="Business hours updated")
-    
-    @action(detail=True, methods=['get'])
-    def members(self, request, pk=None):
-        business = self.get_object()
-        members = business.members.filter(is_active=True)
-        serializer = BusinessMemberSerializer(members, many=True)
-        return success_response(data=serializer.data)
-    
     @action(detail=True, methods=['post'], permission_classes=[BusinessOwnerPermission])
     def add_member(self, request, pk=None):
         business = self.get_object()

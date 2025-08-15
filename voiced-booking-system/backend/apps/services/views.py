@@ -18,13 +18,6 @@ class ServiceCategoryViewSet(FilterActionsMixin, TenantViewSet):
     search_fields = ['name', 'description']
     filterset_fields = ['is_active']
     ordering = ['order', 'name']
-    
-    @action(detail=True, methods=['get'])
-    def services(self, request, pk=None):
-        category = self.get_object()
-        services = category.services.filter(is_active=True)
-        serializer = ServiceListSerializer(services, many=True)
-        return success_response(data=serializer.data)
 
 
 class ServiceViewSet(OptimizedViewSetMixin, StatusActionsMixin, FilterActionsMixin, TenantViewSet):
@@ -46,17 +39,6 @@ class ServiceViewSet(OptimizedViewSetMixin, StatusActionsMixin, FilterActionsMix
         }
         return serializer_map.get(self.action, ServiceSerializer)
     
-    @action(detail=True, methods=['get', 'post'])
-    def providers(self, request, pk=None):
-        service = self.get_object()
-        
-        if request.method == 'GET':
-            providers = service.providers.filter(is_active=True)
-            serializer = ServiceProviderSerializer(providers, many=True)
-            return success_response(data=serializer.data)
-        
-        return self._add_provider(service, request.data)
-    
     @action(detail=False, methods=['get'])
     def public(self, request):
         services = self.get_queryset().filter(
@@ -70,39 +52,6 @@ class ServiceViewSet(OptimizedViewSetMixin, StatusActionsMixin, FilterActionsMix
     def toggle_active(self, request, pk=None):
         result = self.toggle_active_action(request, pk)
         return success_response(data={'is_active': result['is_active']}, message=result['message'])
-    
-    def _add_provider(self, service, data):
-        user_id = data.get('user_id')
-        is_primary = data.get('is_primary', False)
-        
-        if not user_id:
-            return error_response(message="User ID is required")
-        
-        try:
-            from apps.users.models import User
-            user = User.objects.get(id=user_id)
-            
-            if is_primary:
-                ServiceProvider.objects.filter(service=service).update(is_primary=False)
-            
-            provider, created = ServiceProvider.objects.get_or_create(
-                service=service,
-                user=user,
-                defaults={'is_primary': is_primary, 'is_active': True}
-            )
-            
-            if not created:
-                provider.is_primary = is_primary
-                provider.is_active = True
-                provider.save(update_fields=['is_primary', 'is_active'])
-            
-            serializer = ServiceProviderSerializer(provider)
-            return success_response(
-                data=serializer.data,
-                message="Provider added successfully"
-            )
-        except User.DoesNotExist:
-            return error_response(message="User not found")
 
 
 class ServiceProviderViewSet(TenantViewSet):

@@ -7,20 +7,10 @@ from apps.core.viewsets import TenantViewSet
 from apps.core.permissions import BusinessStaffPermission
 from apps.core.exceptions import success_response, error_response
 from apps.core.status_actions import StatusActionsMixin, FilterActionsMixin
-from .models import Appointment, Client
+from .models import Appointment
 from .serializers import (
-    AppointmentSerializer, AppointmentCreateSerializer, AppointmentListSerializer,
-    ClientSerializer
+    AppointmentSerializer, AppointmentCreateSerializer, AppointmentListSerializer
 )
-
-
-class ClientViewSet(TenantViewSet):
-    queryset = Client.objects.all()
-    serializer_class = ClientSerializer
-    permission_classes = [permissions.IsAuthenticated, BusinessStaffPermission]
-    search_fields = ['first_name', 'last_name', 'email', 'phone']
-    filterset_fields = ['email', 'phone']
-    ordering = ['first_name', 'last_name']
 
 
 class AppointmentViewSet(StatusActionsMixin, FilterActionsMixin, TenantViewSet):
