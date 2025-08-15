@@ -4,13 +4,14 @@ from .models import VapiCall
 from .serializers import VapiWebhookSerializer
 from .value_objects import VapiEventType
 from .event_handlers import EventHandlerRegistry
+from .multi_tenant_services import MetadataExtractor
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 class WebhookProcessor:
-    def __init__(self, business):
+    def __init__(self, business=None):
         self.business = business
         self.event_registry = EventHandlerRegistry()
     
@@ -18,11 +19,17 @@ class WebhookProcessor:
         try:
             event_type = VapiEventType(webhook_data.get('message', {}).get('type', ''))
             
+            if not self.business:
+                self.business = MetadataExtractor.get_business_from_metadata(webhook_data)
+                if not self.business:
+                    logger.error("No business found in webhook metadata")
+                    return {'error': 'Business not found in metadata'}
+            
             with transaction.atomic():
                 call = self._save_call_data(webhook_data)
                 result = self.event_registry.handle_event(event_type, call, webhook_data)
                 
-                logger.info(f"Processed {event_type.value} event for call {call.call_id}")
+                logger.info(f"Processed {event_type.value} event for call {call.call_id} (business: {self.business.name})")
                 
                 return self._format_response(result, call, event_type)
                 

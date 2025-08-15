@@ -257,6 +257,8 @@ STRIPE_WEBHOOK_SECRET = config('STRIPE_WEBHOOK_SECRET', default='')
 VAPI_API_KEY = config('VAPI_API_KEY', default='')
 VAPI_WEBHOOK_SECRET = config('VAPI_WEBHOOK_SECRET', default='')
 VAPI_BASE_URL = config('VAPI_BASE_URL', default='https://api.vapi.ai')
+VAPI_WEBHOOK_BASE_URL = config('VAPI_WEBHOOK_BASE_URL', default='https://yourdomain.com')
+VAPI_SHARED_AGENT_ID = config('VAPI_SHARED_AGENT_ID', default='')
 
 # Twilio Configuration (Optional)
 TWILIO_ACCOUNT_SID = config('TWILIO_ACCOUNT_SID', default='')

@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from .value_objects import VapiEventType, CallAnalysisData
 from .models import VapiCall
 from .domain_services import AvailabilityQueryService, AppointmentBookingDomainService
-from .api_client import VapiBusinessService
+from .multi_tenant_services import SharedAgentManager
 import logging
 
 logger = logging.getLogger(__name__)
@@ -91,16 +91,16 @@ class FunctionCallHandler(BaseCallEventHandler):
             }
     
     def _execute_function(self, call: VapiCall, function_name: str, parameters: Dict) -> Any:
-        if function_name == 'get_available_services':
+        if function_name == 'get_business_services':
             service = AvailabilityQueryService(call.business)
             return service.get_available_services()
         
         elif function_name == 'check_availability':
             service = AvailabilityQueryService(call.business)
             return service.check_availability(
-                parameters.get('service_id'),
+                self._find_service_id_by_name(call.business, parameters.get('service_name', '')),
                 parameters.get('date'),
-                parameters.get('duration')
+                None
             )
         
         elif function_name == 'book_appointment':
@@ -120,6 +120,15 @@ class FunctionCallHandler(BaseCallEventHandler):
         
         else:
             raise ValueError(f"Unknown function: {function_name}")
+    
+    def _find_service_id_by_name(self, business, service_name: str) -> Optional[int]:
+        from apps.services.models import Service
+        service = Service.objects.filter(
+            business=business,
+            name__icontains=service_name,
+            is_active=True
+        ).first()
+        return service.id if service else None
 
 
 class AssistantRequestHandler(BaseCallEventHandler):
@@ -130,27 +139,12 @@ class AssistantRequestHandler(BaseCallEventHandler):
         phone_number = event_data.get('call', {}).get('from', {}).get('phoneNumber', '')
         self._log_event("Assistant request", call, f"from {phone_number}")
         
-        config = call.business.vapi_configurations.filter(is_active=True).first()
-        if not config:
-            return {
-                'status': 'error',
-                'error': 'No active VAPI configuration found'
-            }
+        shared_agent = SharedAgentManager()
         
-        vapi_service = VapiBusinessService(call.business)
-        try:
-            assistant_id = vapi_service.get_or_create_assistant()
-            return {
-                'status': 'assistant_provided',
-                'assistantId': assistant_id,
-                'assistant': config.assistant_config
-            }
-        except Exception as e:
-            logger.error(f"Failed to get assistant for business {call.business.id}: {e}")
-            return {
-                'status': 'error',
-                'error': str(e)
-            }
+        return {
+            'status': 'assistant_provided',
+            'assistantId': shared_agent.shared_agent_id
+        }
 
 
 class TranscriptHandler(BaseCallEventHandler):

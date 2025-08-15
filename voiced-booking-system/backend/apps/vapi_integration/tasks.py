@@ -101,20 +101,25 @@ def cleanup_old_call_data():
 
 
 @shared_task
-def sync_vapi_assistants():
-    from .api_client import VapiAPIClient
-    from .models import VapiConfiguration
+def register_tenant_async(business_id: int, area_code: str = None):
+    from .multi_tenant_services import TenantRegistrationService
+    from apps.businesses.models import Business
     
-    client = VapiAPIClient()
-    synced_count = 0
-    
-    for config in VapiConfiguration.objects.filter(is_active=True):
-        try:
-            if config.assistant_id:
-                assistant_data = client.get_assistant(config.assistant_id)
-                logger.info(f"Synced assistant {config.assistant_id} for business {config.business.name}")
-                synced_count += 1
-        except Exception as e:
-            logger.error(f"Failed to sync assistant for business {config.business.name}: {e}")
-    
-    return f"Synced {synced_count} assistants"
+    try:
+        business = Business.objects.get(id=business_id)
+        service = TenantRegistrationService()
+        result = service.register_tenant(business, area_code)
+        
+        if result['success']:
+            logger.info(f"Async tenant registration completed for {business.name}")
+        else:
+            logger.error(f"Async tenant registration failed for {business.name}: {result.get('error')}")
+        
+        return result
+        
+    except Business.DoesNotExist:
+        logger.error(f"Business {business_id} not found for async registration")
+        return {'success': False, 'error': 'Business not found'}
+    except Exception as e:
+        logger.error(f"Async tenant registration error for business {business_id}: {e}")
+        return {'success': False, 'error': str(e)}

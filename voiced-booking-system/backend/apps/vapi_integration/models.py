@@ -28,6 +28,7 @@ class VapiConfiguration(BaseModel):
     max_duration_seconds = models.IntegerField(_('max duration seconds'), default=1800)
     silence_timeout_seconds = models.IntegerField(_('silence timeout seconds'), default=30)
     response_delay_seconds = models.FloatField(_('response delay seconds'), default=0.4)
+    is_shared_agent = models.BooleanField(_('is shared agent'), default=False)
     
     class Meta:
         verbose_name = _('Vapi Configuration')
@@ -36,7 +37,7 @@ class VapiConfiguration(BaseModel):
         constraints = [
             models.UniqueConstraint(
                 fields=['business'], 
-                condition=models.Q(is_active=True),
+                condition=models.Q(is_active=True, is_shared_agent=False),
                 name='unique_active_config_per_business'
             )
         ]

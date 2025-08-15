@@ -36,23 +36,39 @@ class VapiConfigurationViewSet(viewsets.ModelViewSet):
         business = get_object_or_404(Business, id=business_id)
         serializer.save(business=business)
     
-    @action(detail=True, methods=['post'])
-    def sync_assistant(self, request, pk=None):
-        config = self.get_object()
-        try:
-            service = VapiBusinessService(config.business)
-            assistant_id = service.get_or_create_assistant()
+    @action(detail=False, methods=['post'])
+    def register_tenant(self, request):
+        from .multi_tenant_services import TenantRegistrationService
+        
+        business_id = request.data.get('business_id')
+        if not business_id:
             return Response({
-                'success': True,
-                'assistant_id': assistant_id,
-                'message': 'Assistant synced successfully'
-            })
-        except Exception as e:
-            logger.error(f"Assistant sync failed for business {config.business.id}: {e}")
-            return Response({
-                'success': False,
-                'error': str(e)
+                'error': 'Business ID is required'
             }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            business = Business.objects.get(id=business_id)
+            service = TenantRegistrationService()
+            result = service.register_tenant(
+                business=business,
+                area_code=request.data.get('area_code')
+            )
+            
+            if result['success']:
+                logger.info(f"Tenant registered successfully: {business.name}")
+                return Response(result)
+            else:
+                return Response(result, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Business.DoesNotExist:
+            return Response({
+                'error': 'Business not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Tenant registration failed: {e}")
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class VapiCallViewSet(viewsets.ReadOnlyModelViewSet):
@@ -70,6 +86,9 @@ class VapiCallViewSet(viewsets.ReadOnlyModelViewSet):
     
     @action(detail=False, methods=['post'])
     def make_outbound_call(self, request):
+        from .multi_tenant_services import SharedAgentManager
+        from .api_client import VapiAPIClient
+        
         business_id = self.kwargs.get('business_id') or request.data.get('business_id')
         business = get_object_or_404(Business, id=business_id)
         
@@ -80,10 +99,20 @@ class VapiCallViewSet(viewsets.ReadOnlyModelViewSet):
             }, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            service = VapiBusinessService(business)
-            result = service.make_outbound_call(
+            config = business.vapi_configurations.filter(is_active=True).first()
+            if not config:
+                return Response({
+                    'error': 'No VAPI configuration found for business'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            shared_agent = SharedAgentManager()
+            client = VapiAPIClient()
+            
+            result = client.create_phone_call(
                 phone_number=phone_number,
-                **request.data
+                assistant_id=shared_agent.shared_agent_id,
+                phone_number_id=config.phone_number_id,
+                metadata={'tenant_id': str(business.id), 'business_slug': business.slug}
             )
             
             logger.info(f"Outbound call initiated for business {business.id} to {phone_number}")
@@ -127,29 +156,12 @@ class VapiWebhookViewSet(viewsets.ViewSet):
     permission_classes = []
     
     def create(self, request):
-        try:
-            business_slug = BusinessSlug(request.headers.get('X-Business-Slug', ''))
-        except ValueError:
-            logger.error("Missing or invalid X-Business-Slug header")
-            return Response({'error': 'Valid business slug required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        try:
-            business = Business.objects.get(slug=business_slug.value)
-        except Business.DoesNotExist:
-            logger.error(f"Business not found: {business_slug.value}")
-            return Response({'error': 'Business not found'}, status=status.HTTP_404_NOT_FOUND)
-        
-        security_manager = WebhookSecurityManager(business)
-        if not security_manager.validate_request(request, request.body):
-            logger.error(f"Security validation failed for business {business_slug.value}")
-            return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
-        
-        processor = WebhookProcessor(business)
+        processor = WebhookProcessor()
         result = processor.process_webhook(request.data)
         
         if 'error' in result:
-            logger.error(f"Webhook processing failed for business {business_slug.value}: {result}")
+            logger.error(f"Webhook processing failed: {result}")
             return Response(result, status=status.HTTP_400_BAD_REQUEST)
         else:
-            logger.info(f"Webhook processed successfully for business {business_slug.value}")
+            logger.info("Webhook processed successfully")
             return Response(result, status=status.HTTP_200_OK)
