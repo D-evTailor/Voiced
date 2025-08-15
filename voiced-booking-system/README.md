@@ -29,40 +29,42 @@ VoiceAppoint is a modern multi-tenant SaaS system for automatic appointment book
 ```bash
 git clone <repository-url>
 cd voiced-booking-system
-cp .env.example .env
 ```
 
-### 2. Start Development Environment
+### 2. Quick Start
 
 ```bash
-# Start all services
-docker-compose up
-
-# Or start in background
-docker-compose up -d
+make quick-start
 ```
 
-### 3. Initialize Database
+### 3. Manual Setup
 
 ```bash
-# Run migrations
-docker-compose exec backend poetry run python manage.py migrate
-
-# Create superuser
-docker-compose exec backend poetry run python manage.py createsuperuser
-
-# Load sample data (optional)
-docker-compose exec backend poetry run python manage.py loaddata sample_data.json
+make setup
+make dev-build  
+make db-migrate
 ```
 
-### 4. Access Applications
+### 4. Verificar que Todo Funciona ✅
 
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000
-- **Django Admin**: http://localhost:8000/admin
-- **API Docs**: http://localhost:8000/api/docs
-- **PgAdmin** (dev): http://localhost:8080
-- **Redis Commander** (dev): http://localhost:8081
+Después de cualquiera de los métodos anteriores, verifica que estos enlaces funcionen:
+
+- **🎨 Frontend**: http://localhost:3000
+- **⚙️ Backend API**: http://localhost:8000
+- **👤 Django Admin**: http://localhost:8000/admin (admin@voiceappoint.com / admin123)
+- **📚 API Docs**: http://localhost:8000/api/docs
+- **🗄️ PgAdmin** (desarrollo): http://localhost:8080 (admin@voiceappoint.com / admin)
+- **📊 Redis Commander** (desarrollo): http://localhost:8081
+
+### 5. Comandos Útiles
+
+```bash
+make dev              # Desarrollo diario
+make stop             # Parar servicios  
+make logs             # Ver logs
+make clean            # Limpiar Docker
+make fresh-start      # Reset completo
+```
 
 ## 🛠️ Development
 
@@ -122,6 +124,7 @@ docker-compose exec backend bash
 docker-compose exec backend poetry run python manage.py migrate
 
 # Create migrations
+```
 docker-compose exec backend poetry run python manage.py makemigrations
 
 # Run tests
@@ -262,13 +265,6 @@ VAPI_API_KEY=your-vapi-key
 
 Access interactive API documentation at: http://localhost:8000/api/docs
 
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
 
 ### Development Workflow
 
@@ -335,18 +331,3 @@ docker-compose logs backend
 docker-compose logs frontend
 docker-compose logs db
 ```
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 📞 Support
-
-For support, email support@voiceappoint.com or create an issue in the repository.
-
-## 🙏 Acknowledgments
-
-- Django and Django REST Framework communities
-- Next.js team
-- Vapi.ai for voice AI capabilities
-- All contributors and maintainers
