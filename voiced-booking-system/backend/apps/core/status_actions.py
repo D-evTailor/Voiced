@@ -1,33 +1,58 @@
 from django.utils.translation import gettext_lazy as _
+from django.core.exceptions import ValidationError
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from .exceptions import success_response
 
 
 class StatusActionsMixin:
+    status_transitions = {
+        'pending': ['confirmed', 'cancelled'],
+        'confirmed': ['in_progress', 'cancelled', 'no_show'],
+        'in_progress': ['completed', 'cancelled'],
+        'completed': [],
+        'cancelled': [],
+        'no_show': [],
+    }
+    
+    def _validate_status_transition(self, instance, new_status):
+        current_status = getattr(instance, 'status', None)
+        if current_status and new_status not in self.status_transitions.get(current_status, []):
+            raise ValidationError(f"Cannot transition from {current_status} to {new_status}")
+    
     def confirm_action(self, request, pk=None):
         instance = self.get_object()
+        self._validate_status_transition(instance, 'confirmed')
         instance.status = 'confirmed'
         instance.save(update_fields=['status'])
         return {'status': instance.status, 'message': f"{instance._meta.verbose_name} confirmed"}
     
     def cancel_action(self, request, pk=None):
         instance = self.get_object()
+        self._validate_status_transition(instance, 'cancelled')
         instance.status = 'cancelled'
         reason = request.data.get('reason', '')
+        update_fields = ['status']
+        
         if hasattr(instance, 'cancellation_reason'):
             instance.cancellation_reason = reason
-            instance.save(update_fields=['status', 'cancellation_reason'])
-        else:
-            instance.save(update_fields=['status'])
+            update_fields.append('cancellation_reason')
+        
+        instance.save(update_fields=update_fields)
         return {'status': instance.status, 'message': f"{instance._meta.verbose_name} cancelled"}
     
     def complete_action(self, request, pk=None):
         instance = self.get_object()
+        self._validate_status_transition(instance, 'completed')
         instance.status = 'completed'
-        if hasattr(instance, 'end_time'):
+        update_fields = ['status']
+        
+        if hasattr(instance, 'completed_at'):
             from django.utils import timezone
-            instance.end_time = timezone.now()
-            instance.save(update_fields=['status', 'end_time'])
-        else:
-            instance.save(update_fields=['status'])
+            instance.completed_at = timezone.now()
+            update_fields.append('completed_at')
+        
+        instance.save(update_fields=update_fields)
         return {'status': instance.status, 'message': f"{instance._meta.verbose_name} completed"}
     
     def toggle_active_action(self, request, pk=None):
@@ -61,3 +86,20 @@ class FilterActionsMixin:
     
     def get_active_queryset(self, request):
         return self.get_queryset().filter(is_active=True)
+    
+    @action(detail=False, methods=['get'])
+    def today(self, request):
+        queryset = self.get_today_queryset(request)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return success_response(data=serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def upcoming(self, request):
+        queryset = self.get_upcoming_queryset(request)
+        serializer = self.get_serializer(queryset, many=True)
+        return success_response(data=serializer.data)

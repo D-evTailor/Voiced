@@ -13,7 +13,10 @@ from .exceptions import success_response, error_response
 
 class IdempotencyMixin:
     def get_idempotency_key(self, request):
-        return request.headers.get('Idempotency-Key')
+        key = request.headers.get('Idempotency-Key')
+        if key and hasattr(request, 'business') and request.business:
+            return f"{request.business.id}:{key}"
+        return key
     
     def check_idempotency(self, request):
         key = self.get_idempotency_key(request)
@@ -41,6 +44,15 @@ class IdempotencyMixin:
             return cached_response
         
         response = super().create(request, *args, **kwargs)
+        self.store_idempotent_response(request, response)
+        return response
+    
+    def update(self, request, *args, **kwargs):
+        cached_response = self.check_idempotency(request)
+        if cached_response:
+            return cached_response
+        
+        response = super().update(request, *args, **kwargs)
         self.store_idempotent_response(request, response)
         return response
 

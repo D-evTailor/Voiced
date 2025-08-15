@@ -3,12 +3,10 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from datetime import datetime, timedelta
 from .constants import STATUS_TRANSITIONS
-from .utils import PHONE_REGEX_VALIDATOR
 
 
 def get_localized_day_name(day_of_week):
     from .choices import DAYS_OF_WEEK_CHOICES
-    
     day_dict = dict(DAYS_OF_WEEK_CHOICES)
     return str(day_dict.get(day_of_week, _('Unknown')))
 
@@ -108,3 +106,87 @@ def normalize_phone_number(phone):
         cleaned = '+' + cleaned
     
     return cleaned
+
+
+def parse_date_param(date_string, param_name="date"):
+    if not date_string:
+        return None
+    
+    try:
+        return datetime.strptime(date_string, '%Y-%m-%d').date()
+    except ValueError:
+        raise ValidationError(f"Invalid {param_name} format. Use YYYY-MM-DD")
+
+
+def parse_datetime_param(datetime_string, param_name="datetime"):
+    if not datetime_string:
+        return None
+    
+    formats = ['%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M']
+    
+    for fmt in formats:
+        try:
+            return datetime.strptime(datetime_string, fmt)
+        except ValueError:
+            continue
+    
+    raise ValidationError(f"Invalid {param_name} format")
+
+
+def format_currency(amount, currency='EUR'):
+    if amount is None:
+        return ""
+    
+    currency_symbols = {
+        'EUR': '€',
+        'USD': '$',
+        'GBP': '£',
+    }
+    
+    symbol = currency_symbols.get(currency, currency)
+    return f"{amount:.2f} {symbol}"
+
+
+def generate_time_slots(start_time, end_time, slot_duration=30):
+    slots = []
+    current = start_time
+    
+    while current < end_time:
+        slots.append(current.strftime('%H:%M'))
+        current += timedelta(minutes=slot_duration)
+    
+    return slots
+
+
+def validate_business_context(request):
+    if not hasattr(request, 'business') or not request.business:
+        from rest_framework.exceptions import PermissionDenied
+        raise PermissionDenied("Business context required")
+    return request.business
+
+
+def get_client_ip(request):
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        return x_forwarded_for.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR')
+
+
+def format_time_range(start_time, end_time):
+    if not start_time or not end_time:
+        return ""
+    return f"{start_time.strftime('%H:%M')} - {end_time.strftime('%H:%M')}"
+
+
+def is_business_hours(dt, business_hours=None):
+    if not business_hours:
+        return True
+    
+    day_of_week = dt.weekday()
+    hours = business_hours.filter(day_of_week=day_of_week, is_closed=False).first()
+    
+    if not hours or not hours.open_time or not hours.close_time:
+        return False
+    
+    time_part = dt.time()
+    return hours.open_time <= time_part <= hours.close_time

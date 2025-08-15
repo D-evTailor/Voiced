@@ -7,6 +7,7 @@ from apps.core.viewsets import TenantViewSet
 from apps.core.permissions import BusinessStaffPermission
 from apps.core.exceptions import success_response, error_response
 from apps.core.status_actions import StatusActionsMixin, FilterActionsMixin
+from apps.core.mixins import TimeCalculationMixin
 from .models import Appointment
 from .serializers import (
     AppointmentSerializer, AppointmentCreateSerializer, AppointmentListSerializer
@@ -47,7 +48,7 @@ class AppointmentViewSet(StatusActionsMixin, FilterActionsMixin, TenantViewSet):
         result = self.confirm_action(request, pk)
         return success_response(data={'status': result['status']}, message=result['message'])
     
-    @action(detail=True, methods=['patch'])
+    @action(detail=True, methods=['patch'])  
     def cancel(self, request, pk=None):
         result = self.cancel_action(request, pk)
         return success_response(data={'status': result['status']}, message=result['message'])
@@ -56,27 +57,9 @@ class AppointmentViewSet(StatusActionsMixin, FilterActionsMixin, TenantViewSet):
     def complete(self, request, pk=None):
         result = self.complete_action(request, pk)
         return success_response(data={'status': result['status']}, message=result['message'])
-    
-    @action(detail=False, methods=['get'])
-    def today(self, request):
-        queryset = self.get_today_queryset(request)
-        
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-        
-        serializer = self.get_serializer(queryset, many=True)
-        return success_response(data=serializer.data)
-    
-    @action(detail=False, methods=['get'])
-    def upcoming(self, request):
-        queryset = self.get_upcoming_queryset(request)
-        serializer = self.get_serializer(queryset, many=True)
-        return success_response(data=serializer.data)
 
 
-class AvailabilityView(APIView):
+class AvailabilityView(APIView, TimeCalculationMixin):
     permission_classes = [permissions.IsAuthenticated, BusinessStaffPermission]
     
     def get(self, request):

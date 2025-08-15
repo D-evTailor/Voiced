@@ -187,12 +187,14 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_CLASSES': [
         'apps.core.throttling.BurstRateThrottle',
         'apps.core.throttling.SustainedRateThrottle',
+        'apps.core.throttling.BusinessAwareRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
         'burst': '60/min',
         'sustained': '1000/hour',
         'webhook': '100/min',
         'api_key': '5000/hour',
+        'business_aware': '2000/hour',
     }
 }
 
