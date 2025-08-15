@@ -17,7 +17,8 @@ voiced-booking-system/
 ├── docs/
 │   ├── API.md
 │   ├── DEPLOYMENT.md
-│   └── VAPI_INTEGRATION.md
+│   ├── VAPI_INTEGRATION.md
+│   └── VAPI_INTEGRATION_API_DOC.md     # Complete VAPI API documentation
 ├── frontend/                        # Next.js + Tailwind
 │   └── Dockerfile                   # Frontend Docker image
 ├── backend/                         # Django REST Framework
@@ -70,7 +71,7 @@ voiced-booking-system/
 - **CI/CD**: GitHub Actions
 
 ### **External Integrations**
-- **Voice Agent**: Vapi.ai
+- **Voice Agent**: Vapi.ai (Complete API integration documented)
 - **Payments**: Stripe
 - **Email**: SendGrid
 - **SMS**: Twilio (optional)
@@ -223,14 +224,16 @@ backend/
 │   │   ├── admin.py
 │   │   ├── managers.py
 │   │   └── migrations/
-│   ├── businesses/                  # Businesses
-│   │   ├── models.py                # Business, BusinessHours
+│   ├── businesses/                  # Business management
+│   │   ├── models.py                # Business, BusinessHours, BusinessMember
 │   │   ├── serializers.py
 │   │   ├── views.py
 │   │   ├── urls.py
+│   │   ├── onboarding_models.py     # BusinessDashboardConfig, BusinessOnboardingStatus
+│   │   ├── onboarding_serializers.py
 │   │   └── migrations/
 │   ├── services/                    # Services per business
-│   │   ├── models.py                # Service, Resource
+│   │   ├── models.py                # Service, ServiceCategory
 │   │   ├── serializers.py
 │   │   ├── views.py
 │   │   ├── urls.py
@@ -240,30 +243,37 @@ backend/
 │   │   ├── serializers.py
 │   │   ├── views.py
 │   │   ├── urls.py
-│   │   ├── utils.py                 # Availability logic
-│   │   ├── consumers.py             # WebSocket consumers (REAL-TIME)
-│   │   ├── routing.py               # WebSocket routing
 │   │   └── migrations/
-│   ├── payments/                    # Stripe integration
-│   │   ├── models.py                # Subscription, Payment
+│   ├── clients/                     # Client management
+│   │   ├── models.py                # Client
 │   │   ├── serializers.py
 │   │   ├── views.py
 │   │   ├── urls.py
-│   │   ├── stripe_utils.py
 │   │   └── migrations/
-│   ├── vapi_integration/            # Vapi endpoints
-│   │   ├── models.py                # VapiConfig
+│   ├── payments/                    # Payment integration
+│   │   ├── models.py                # Payment records
 │   │   ├── serializers.py
-│   │   ├── views.py                 # Tools endpoints + Webhooks
+│   │   ├── views.py
 │   │   ├── urls.py
-│   │   ├── utils.py                 # Vapi helpers
-│   │   ├── webhooks.py              # Vapi webhook handlers (REAL-TIME)
 │   │   └── migrations/
-│   ├── notifications/               # Email/SMS
+│   ├── vapi_integration/            # VAPI integration system
+│   │   ├── models.py                # VapiConfiguration, VapiCall, VapiCallTranscript, etc.
+│   │   ├── serializers.py           # VapiWebhookSerializer, VapiConfigurationSerializer
+│   │   ├── views.py                 # Webhook endpoints, configuration management
+│   │   ├── urls.py
+│   │   ├── multi_tenant_services.py # SharedAgentManager, TenantRegistrationService
+│   │   ├── event_handlers.py        # EventHandlerRegistry, function call handlers
+│   │   ├── domain_services.py       # AvailabilityQueryService, AppointmentBookingDomainService
+│   │   ├── processors.py            # WebhookProcessor
+│   │   ├── api_client.py            # VapiAPIClient, VapiBusinessService
+│   │   ├── security.py              # WebhookSecurityManager
+│   │   ├── value_objects.py         # Data classes and value objects
+│   │   ├── tasks.py                 # Async processing tasks
+│   │   └── migrations/
+│   ├── notifications/               # Notification system
 │   │   ├── models.py
-│   │   ├── tasks.py                 # Celery tasks
+│   │   ├── tasks.py                 # Notification tasks
 │   │   ├── utils.py
-│   │   ├── real_time.py             # Real-time notification utils
 │   │   └── migrations/
 │   └── analytics/                   # Reports and metrics
 │       ├── models.py
@@ -437,6 +447,66 @@ frontend/
 ---
 
 > **Goal**: Deliver a complete starter boilerplate so the team can start building immediately
+
+---
+
+## 🤖 **VAPI INTEGRATION ARCHITECTURE**
+
+### **Complete Voice Agent System**
+
+VoiceAppoint implements a sophisticated multi-business voice agent system using a **shared agent architecture** where a single VAPI agent handles calls for multiple businesses with intelligent context switching.
+
+#### **Key Components:**
+
+```
+🏢 Business Phone → 📞 VAPI Agent → 🔗 Webhook → ⚙️ Django → 💾 Database
+                                      ↓
+                                📋 Event Handler Registry
+                                      ↓
+                            🛠️ Function Call Handlers
+                                      ↓
+                              📊 Domain Services
+```
+
+#### **Integration Features:**
+
+✅ **Shared Agent Architecture**: Single VAPI agent serves multiple businesses  
+✅ **Metadata-Based Routing**: Business identification via phone number metadata  
+✅ **Function Call System**: Dynamic business logic execution  
+✅ **Real-time Processing**: Webhook-based event handling  
+✅ **Multi-business Support**: Complete data isolation per business  
+✅ **Conversation Analytics**: Call tracking and analysis  
+✅ **Appointment Integration**: Direct booking system integration  
+
+#### **Available Functions:**
+
+| Function | Description | Usage |
+|----------|-------------|-------|
+| `get_business_services` | Retrieve available services | Service discovery |
+| `check_service_availability` | Check time slot availability | Scheduling |
+| `book_appointment` | Create appointment booking | Reservation |
+| `get_business_hours` | Get operating hours | Schedule info |
+
+#### **Data Flow:**
+
+1. **Call Reception** → VAPI receives call with business context
+2. **Business Identification** → Metadata extraction identifies business
+3. **Context Loading** → Business services and configuration loaded
+4. **Function Execution** → Agent calls business-specific functions
+5. **Data Processing** → Domain services handle business logic
+6. **Response Generation** → Structured responses sent to agent
+7. **Call Completion** → Final processing and analytics
+
+#### **API Endpoints:**
+
+- `POST /api/v1/vapi_integration/webhook/` - Main webhook processor
+- `GET /api/v1/vapi_integration/configs/` - Configuration management
+- `GET /api/v1/vapi_integration/calls/` - Call history and analytics
+- `POST /api/v1/vapi_integration/business/{id}/calls/outbound/` - Outbound calls
+
+**📚 Complete Documentation:** See `VAPI_INTEGRATION_API_DOC.md` for detailed API reference, examples, and implementation details.
+
+---
 
 ### **🔁 Single Phase: Complete Boilerplate (3-5 days)**
 

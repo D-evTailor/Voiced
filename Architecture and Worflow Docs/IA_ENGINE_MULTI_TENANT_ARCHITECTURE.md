@@ -9,7 +9,23 @@
 
 ### **Core Concept: One Vapi Agent, Multiple Businesses**
 
-VoiceAppoint is based on a **single distributed agent** paradigm, where a single Vapi AI agent handles all phone interactions for multiple businesses (tenants) with personalized calendars, fully integrated with our Django + Next.js tech stack.
+VoiceAppoint is bas#### **System Technical Metrics**
+- **Django-Vapi Latency**: Average webhook processing time < 200ms
+- **Business ID Accuracy**: 99.9% of calls correctly routed to businesses
+- **VoiceAppoint Uptime**: Full stack availability > 99.9%
+- **Error Rate**: < 0.1% failed operations in production
+
+### **6.2 VoiceAppoint Business Metrics**
+- **Conversion Rate**: % of calls resulting in registered appointments
+- **Business Satisfaction**: NPS of business owners using VoiceAppoint
+- **Client Experience**: End-client satisfaction with the agent
+- **Revenue per Business**: Average revenue per business using VoiceAppoint
+
+### **6.3 VoiceAppoint Operational Metrics**
+- **Customer Acquisition Cost**: Cost to onboard a new business
+- **Monthly Churn Rate**: % of businesses canceling VoiceAppoint monthly
+- **Lifetime Value**: Total value of a business in VoiceAppoint
+- **Gross Margin**: Profitability after Vapi + infrastructure costsdistributed agent** paradigm, where a single Vapi AI agent handles all phone interactions for multiple businesses (tenants) with personalized calendars, fully integrated with our Django + Next.js tech stack.
 
 **Strategic Advantages in VoiceAppoint:**
 - **Economies of Scale**: Drastic reduction in operational costs by maintaining a single Vapi agent
@@ -130,10 +146,10 @@ The agent uses our specific training to:
 
 #### **Specialized Function Calling in VoiceAppoint**
 When the agent needs to interact with our system:
-- **check_availability**: Checks available slots in our Django system
+- **get_business_services**: Retrieves available services for the current business
+- **check_service_availability**: Checks available slots for a specific service and date
 - **book_appointment**: Creates appointments directly in our `appointments` model
-- **get_business_info**: Retrieves info from `tenants` and `services` models
-- **modify_appointment**: Allows modifications to existing appointments
+- **get_business_hours**: Retrieves operating hours for the current business
 
 #### **Enriched Data Transmission to Django**
 The function call includes:
@@ -149,39 +165,39 @@ The function call includes:
 ### **3.1 Django Webhook Reception and Analysis**
 
 #### **Real-Time Vapi Event Processing**
-Our Django REST Framework receives Vapi webhooks at `/api/v1/vapi/webhooks/`:
-- **Call Events**: `call-started`, `call-ended`, `call-transferred`
-- **Function Events**: `function-call-initiated`, `function-call-completed`
-- **Conversation Events**: `speech-update`, `transcript-update`
-- **Logging in VAPI_CALL_LOGS**: Automatic logging in our model for auditing
+Our Django REST Framework receives Vapi webhooks at `/api/v1/vapi_integration/webhook/`:
+- **Call Events**: `call-started`, `call-ended`, `assistant-request`
+- **Function Events**: `function-call` (includes function execution)
+- **Conversation Events**: `transcript`, `end-of-call-report`
+- **Logging in VapiCall**: Automatic logging in our model for auditing
 
 #### **Intelligent Context Extraction in VoiceAppoint**
 For each webhook processed in Django:
-- **Metadata Parsing**: Extract `tenant_id` and load the `tenants` model
+- **Metadata Parsing**: Extract `tenant_id` from call metadata using `MetadataExtractor`
 - **Business Identification**: Full profile load from `vapi_configurations`
 - **Authorization Validation**: Verification using our Django permissions system
-- **Context Preparation**: Load `services`, `resources`, and `resource_schedules`
+- **Context Preparation**: Load `services`, `resources`, and `business_hours`
 
 ### **3.2 Tenant-Specific Business Logic in VoiceAppoint**
 
 #### **Contextualized Execution of Django Operations**
 
-**For Availability Queries (`check_availability`):**
-- **Specific Schedule Load**: Access `appointments` filtered by `tenant_id`
-- **Rule Application**: Query `resource_schedules` and `resource_blocks`
-- **Availability Calculation**: Algorithm using `services`, `resources`, and `service_resources` models
+**For Availability Queries (`check_service_availability`):**
+- **Specific Schedule Load**: Access `appointments` filtered by `business`
+- **Business Hours Application**: Query `business_hours` model 
+- **Availability Calculation**: Algorithm using `services` and existing `appointments` models
 - **Formatted Response**: JSON response compatible with the Vapi agent
 
 **For Appointment Bookings (`book_appointment`):**
 - **Capacity Validation**: Real-time verification using our availability system
 - **Appointment Creation**: Insert into `appointments` model with all relations
-- **Resource Assignment**: Create records in `appointment_resources`
-- **Notifications**: Trigger Celery tasks for confirmation via SendGrid
-- **WebSocket Broadcast**: Real-time update of the Next.js dashboard
+- **Client Management**: Create/update records in `clients` model
+- **Notifications**: Trigger tasks for confirmation via notification system
+- **Cache Invalidation**: Real-time cache update for availability queries
 
-**For Information Queries (`get_business_info`):**
-- **Data Retrieval**: Query `tenants`, `services`, `resources` models
-- **Personalized Response**: Formatting according to tenant's `business_type`
+**For Service Information (`get_business_services`):**
+- **Data Retrieval**: Query `services` model filtered by business
+- **Active Services**: Filter only active services for the business
 - **Redis Cache**: Use cache for frequently queried information
 
 ### **3.3 Real-Time Response and Update Management**
@@ -195,10 +211,10 @@ Once logic is processed in our Django backend:
 
 #### **Return Transmission to Vapi and Frontend Update**
 - **Response to Vapi**: Send structured JSON response back to the agent
-- **WebSocket Broadcast**: Immediate notification via Django Channels to the Next.js dashboard
-- **Logging in AUDIT_LOGS**: Complete logging in our audit system
+- **Event Processing**: Process webhooks through `EventHandlerRegistry` system
+- **Logging in VapiCall**: Complete logging in our call tracking system
 - **Cache Update**: Redis cache update for future queries
-- **Metrics Update**: Update metrics in `business_metrics` model
+- **Metrics Update**: Update metrics in `vapi_usage_metrics` model
 
 ---
 
@@ -209,34 +225,34 @@ Once logic is processed in our Django backend:
 #### **Usage Metrics Capture in Django**
 Our Django system implements exhaustive measurement using our models:
 
-**Temporal Metrics in VAPI_CALL_LOGS:**
-- **Call Duration**: `call_duration_seconds` field per tenant
+**Temporal Metrics in VapiCall:**
+- **Call Duration**: `duration_seconds` calculated property per business
 - **Processing Time**: Webhook processing latency logging
 - **Response Time**: Django-Vapi performance measurement
 
-**Interaction Metrics in BUSINESS_METRICS:**
-- **Number of Function Calls**: Operation count per tenant
-- **Operation Complexity**: Classification by type (availability, booking, info)
+**Interaction Metrics in VapiUsageMetrics:**
+- **Number of Function Calls**: Operation count per business
+- **Operation Complexity**: Classification by type (availability, booking, services)
 - **Booking Success**: Conversion rate from calls to appointments
 
 **Resource Metrics using PostgreSQL:**
-- **Availability Queries**: Computational complexity measurement
-- **Operations Rate**: Number of operations per period
-- **Storage Usage**: Data volume per tenant
+- **Availability Queries**: Computational complexity measurement via domain services
+- **Operations Rate**: Number of operations per period tracked in VapiUsageMetrics
+- **Storage Usage**: Data volume per business in VapiCall model
 
 ### **4.2 VoiceAppoint Cost Attribution Algorithm**
 
-#### **Proportional Distribution using SUBSCRIPTIONS and PAYMENTS**
-Our Django system implements a sophisticated algorithm integrated with Stripe:
+#### **Proportional Distribution using Business and Payments**
+Our Django system implements a sophisticated algorithm integrated with payment processing:
 
-**Base Cost Calculation using SUBSCRIPTION_PLANS:**
-- **Fixed Cost per Minute**: Distribution based on tenant's subscription plan
+**Base Cost Calculation using Business subscription_status:**
+- **Fixed Cost per Minute**: Distribution based on business's subscription tier
 - **Variable Cost per Operation**: Assignment according to number of registered function calls
 - **VoiceAppoint Overhead**: Proportional distribution of Django + Redis + PostgreSQL infrastructure
 
-**Adjustment Factors according to BUSINESS_METRICS:**
+**Adjustment Factors according to VapiUsageMetrics:**
 - **Business Complexity**: Businesses with multiple services pay proportionally more
-- **Usage Volume**: Automatic discounts according to tiers in `subscription_plans`
+- **Usage Volume**: Automatic discounts according to usage tiers
 - **Premium Performance**: Adjustments for usage during system peak hours
 
 ### **4.3 Billing Processing with Stripe**
@@ -244,19 +260,19 @@ Our Django system implements a sophisticated algorithm integrated with Stripe:
 #### **Automated Billing Cycle Django + Celery**
 
 **Periodic Aggregation with Django ORM:**
-- **Data Collection**: Aggregated queries from `vapi_call_logs` and `business_metrics`
+- **Data Collection**: Aggregated queries from `vapi_calls` and `vapi_usage_metrics`
 - **Integrity Validation**: Consistency verification using PostgreSQL constraints
-- **Total Calculation**: Celery tasks for heavy billing processing
+- **Total Calculation**: Tasks for heavy billing processing
 
-**Invoice Generation integrated with PAYMENTS:**
+**Invoice Generation integrated with Payment system:**
 - **Detailed Breakdown**: Creation using Django models with usage type breakdown
-- **Historical Comparison**: Queries to `business_metrics` for trends
-- **Stripe Integration**: Automatic synchronization with Stripe webhooks
+- **Historical Comparison**: Queries to `vapi_usage_metrics` for trends
+- **Payment Integration**: Automatic synchronization with payment system
 
-**Payment Processing with Stripe + Django:**
-- **Automatic Charge**: Stripe integration using `stripe_subscription_id`
-- **Failure Handling**: Celery tasks for retrying failed payments
-- **Notifications**: SendGrid integration for automatic communication
+**Payment Processing with Django:**
+- **Automatic Charge**: Payment integration based on usage metrics
+- **Failure Handling**: Tasks for retrying failed payments
+- **Notifications**: Integration for automatic communication
 
 ---
 
@@ -266,13 +282,13 @@ Our Django system implements a sophisticated algorithm integrated with Stripe:
 
 #### **VoiceAppoint Single Agent Optimization**
 - **Concurrency Management**: The master agent handles multiple conversations using PostgreSQL metadata
-- **Redis Caching**: Smart cache for `services`, `resources`, and `vapi_configurations`
-- **Django Load Balancing**: Load distribution using Gunicorn + Nginx for Vapi webhooks
+- **Redis Caching**: Smart cache for `services`, `vapi_configurations`, and availability data
+- **Django Load Balancing**: Load distribution for Vapi webhooks processing
 
-#### **VoiceAppoint Microservices Architecture**
+#### **VoiceAppoint Architecture Pattern**
 - **Modular Django Apps**: Separation into `appointments`, `vapi_integration`, `payments`, etc.
-- **Resilience with Celery**: Asynchronous tasks for heavy operations (Vapi API calls, Stripe)
-- **Monitoring with Sentry**: Full observability of the Django + Next.js stack
+- **Resilience with Tasks**: Asynchronous processing for heavy operations (analysis, billing)
+- **Monitoring**: Full observability of the Django stack
 
 ### **5.2 Personalization vs. Efficiency in VoiceAppoint**
 
@@ -282,21 +298,21 @@ Our Django system implements a sophisticated algorithm integrated with Stripe:
 - **Branding Limitations**: Reduced ability to reflect unique personality per `business_type`
 
 #### **VoiceAppoint Mitigation Strategies**
-- **Cache Warming**: Pre-load Redis with frequent info from active tenants
-- **Post-ID Personalization**: Aggressive personalization using `tenants` and `vapi_configurations` data
-- **Feedback Loop**: Analytics in `business_metrics` for continuous agent improvement
+- **Cache Warming**: Pre-load Redis with frequent info from active businesses
+- **Post-ID Personalization**: Aggressive personalization using `businesses` and `vapi_configurations` data
+- **Feedback Loop**: Analytics in `vapi_usage_metrics` for continuous agent improvement
 
 ### **5.3 VoiceAppoint Security and Compliance**
 
-#### **Multi-Tenant Data Isolation**
-- **Django Segregation**: Row-level security using `tenant_id` in all models
-- **Audit with AUDIT_LOGS**: Full traceability using our audit system
+#### **Multi-Business Data Isolation**
+- **Django Segregation**: Row-level security using `business` foreign key in all models
+- **Audit with VapiCall**: Full traceability using our call tracking system
 - **Encryption**: PostgreSQL encryption + HTTPS/TLS for Vapi webhooks
 
 #### **VoiceAppoint Regulatory Compliance**
-- **GDPR Compliance**: Handling `clients` data per regulations with soft deletes
-- **HIPAA for Clinics**: Extra protections for 'clinic' tenants in `business_type`
-- **PCI DSS with Stripe**: Payment security using Stripe as certified processor
+- **GDPR Compliance**: Handling `clients` data per regulations with proper deletion
+- **HIPAA for Clinics**: Extra protections for 'clinic' businesses in `business_type`
+- **Payment Security**: Secure payment processing integration
 
 ---
 
@@ -326,46 +342,43 @@ Our Django system implements a sophisticated algorithm integrated with Stripe:
 
 ### **🔄 VoiceAppoint Phone Booking Flow (Vapi + Django)**
 ```
-1. VAPI_CONFIGURATIONS → Configures agent behavior per tenant
-2. VAPI_CALL_LOGS → Logs full conversation in PostgreSQL
-3. CLIENTS → Identifies or creates client in Django model
-4. SERVICES → Identifies requested service from tenant catalog
-5. RESOURCES + RESOURCE_SCHEDULES → Checks availability using Django algorithm
-6. APPOINTMENTS → Creates appointment in PostgreSQL with full relations
-7. APPOINTMENT_RESOURCES → Assigns specific resources
-8. NOTIFICATIONS + Celery → Sends automatic confirmation via SendGrid
-9. WebSocket → Updates Next.js dashboard in real time
+1. VapiConfiguration → Configures agent behavior per business
+2. VapiCall → Logs full conversation in PostgreSQL
+3. Client → Identifies or creates client in Django model
+4. Service → Identifies requested service from business catalog
+5. BusinessHours + Appointment → Checks availability using Django algorithm
+6. Appointment → Creates appointment in PostgreSQL with full relations
+7. VapiAppointmentIntegration → Links Vapi call with created appointment
+8. Notifications → Sends automatic confirmation via notification system
+9. Cache Invalidation → Updates availability cache in real time
 ```
 
 ### **📊 VoiceAppoint Availability Flow**
 ```
-1. SERVICES → Defines duration and required resources per tenant
-2. SERVICE_RESOURCES → Lists resources needed for the service
-3. RESOURCE_SCHEDULES → Base available hours per resource
-4. RESOURCE_BLOCKS → Subtracts exceptions/temporary blocks
-5. APPOINTMENTS + APPOINTMENT_RESOURCES → Subtracts occupied slots
-6. Django Algorithm → Calculates available slots for booking
-7. Redis Cache → Stores result for future queries
-8. Vapi Response → Returns available slots to the agent
+1. Service → Defines duration and service details per business
+2. BusinessHours → Base available hours per business
+3. Appointment → Subtracts occupied slots from existing appointments
+4. AvailabilityQueryService → Calculates available slots for booking
+5. Redis Cache → Stores result for future queries
+6. Function Response → Returns available slots to the agent
 ```
 
 ### **💰 VoiceAppoint SaaS Billing Flow**
 ```
-1. SUBSCRIPTION_PLANS → Defines limits and prices per tier
-2. SUBSCRIPTIONS → Current business state with Stripe sync
-3. BUSINESS_METRICS → Monitors usage vs plan limits
-4. Celery Tasks → Processes automatic monthly billing
-5. PAYMENTS + Stripe → Processes automatic charges
-6. Auto-upgrade/downgrade → Based on usage patterns
+1. Business.subscription_status → Defines current business subscription state
+2. VapiUsageMetrics → Monitors usage vs subscription limits
+3. Tasks → Processes automatic billing calculations
+4. Payment Integration → Processes charges based on usage
+5. Auto-scaling → Based on usage patterns and business growth
 ```
 
-### **🔐 VoiceAppoint Multi-Tenant Authentication Flow**
+### **🔐 VoiceAppoint Multi-Business Authentication Flow**
 ```
-1. USERS → Validates Django authentication credentials
-2. USER_SESSIONS → Creates/validates JWT token with Django Simple JWT
-3. TENANT_USERS → Determines businesses accessible by the user
-4. Tenant Context → Filters all subsequent data by tenant_id
-5. AUDIT_LOGS → Logs accesses and actions in PostgreSQL
+1. User → Validates Django authentication credentials
+2. JWT Token → Creates/validates token with Django authentication
+3. BusinessMember → Determines businesses accessible by the user
+4. Business Context → Filters all subsequent data by business relationship
+5. VapiCall → Logs accesses and actions in PostgreSQL
 ```
 
 ---
