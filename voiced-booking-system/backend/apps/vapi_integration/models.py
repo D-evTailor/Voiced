@@ -9,11 +9,12 @@ from .optimizations import cache_service, VapiCacheKeys
 class VapiConfiguration(BaseModel):
     business = models.ForeignKey('businesses.Business', on_delete=models.CASCADE, related_name='vapi_configurations')
     phone_number_id = models.CharField(_('phone number ID'), max_length=255, blank=True)
+    phone_number = models.CharField(_('phone number'), max_length=20, blank=True)
     assistant_id = models.CharField(_('assistant ID'), max_length=255, blank=True)
     assistant_name = models.CharField(_('assistant name'), max_length=100, default='Booking Assistant')
     language = models.CharField(_('language'), max_length=10, choices=LANGUAGE_CHOICES, default='es')
     server_url = models.URLField(_('server URL'))
-    server_secret = models.CharField(_('server secret'), max_length=255)
+    server_secret = models.CharField(_('server secret'), max_length=255, blank=True)
     webhook_timeout = models.IntegerField(
         _('webhook timeout (ms)'), 
         default=7500,
@@ -28,7 +29,8 @@ class VapiConfiguration(BaseModel):
     max_duration_seconds = models.IntegerField(_('max duration seconds'), default=1800)
     silence_timeout_seconds = models.IntegerField(_('silence timeout seconds'), default=30)
     response_delay_seconds = models.FloatField(_('response delay seconds'), default=0.4)
-    is_shared_agent = models.BooleanField(_('is shared agent'), default=False)
+    is_shared_agent = models.BooleanField(_('is shared agent'), default=True)
+    metadata = models.JSONField(_('metadata'), default=dict, blank=True)
     
     class Meta:
         verbose_name = _('Vapi Configuration')
@@ -37,20 +39,32 @@ class VapiConfiguration(BaseModel):
         constraints = [
             models.UniqueConstraint(
                 fields=['business'], 
-                condition=models.Q(is_active=True, is_shared_agent=False),
+                condition=models.Q(is_active=True),
                 name='unique_active_config_per_business'
+            ),
+            models.UniqueConstraint(
+                fields=['phone_number_id'],
+                condition=models.Q(phone_number_id__isnull=False),
+                name='unique_phone_number_id'
             )
         ]
         indexes = [
             models.Index(fields=['business', 'is_active']),
             models.Index(fields=['phone_number_id']),
             models.Index(fields=['assistant_id']),
+            models.Index(fields=['is_shared_agent']),
         ]
     
     def __str__(self):
-        return f"{self.business.name} - Vapi Config"
+        return f"{self.business.name} - Vapi Config {'(Shared)' if self.is_shared_agent else ''}"
     
     def save(self, *args, **kwargs):
+        if self.is_shared_agent and not self.metadata:
+            self.metadata = {
+                'tenant_id': str(self.business.id),
+                'business_name': self.business.name,
+                'business_slug': self.business.slug
+            }
         super().save(*args, **kwargs)
         cache_service.invalidate_pattern(VapiCacheKeys.business_config(self.business_id))
     
@@ -66,6 +80,7 @@ class VapiConfiguration(BaseModel):
             'voice': {'provider': self.voice_provider, 'voiceId': self.voice_id},
             'model': {'provider': self.model_provider, 'model': self.model_name},
             'serverUrl': self.server_url,
+            'serverUrlSecret': self.server_secret,
             'maxDurationSeconds': self.max_duration_seconds,
             'silenceTimeoutSeconds': self.silence_timeout_seconds,
             'responseDelaySeconds': self.response_delay_seconds,
@@ -161,3 +176,29 @@ class VapiAppointmentIntegration(models.Model):
     
     def __str__(self):
         return f"{self.call.call_id} -> {self.appointment.id if self.appointment else 'No appointment'}"
+
+
+class VapiUsageMetrics(models.Model):
+    business = models.ForeignKey('businesses.Business', on_delete=models.CASCADE, related_name='vapi_usage')
+    date = models.DateField(_('date'))
+    total_calls = models.PositiveIntegerField(_('total calls'), default=0)
+    total_minutes = models.DecimalField(_('total minutes'), max_digits=10, decimal_places=2, default=0)
+    total_function_calls = models.PositiveIntegerField(_('total function calls'), default=0)
+    successful_bookings = models.PositiveIntegerField(_('successful bookings'), default=0)
+    failed_bookings = models.PositiveIntegerField(_('failed bookings'), default=0)
+    estimated_cost = models.DecimalField(_('estimated cost'), max_digits=10, decimal_places=4, default=0)
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
+    
+    class Meta:
+        verbose_name = _('Vapi Usage Metrics')
+        verbose_name_plural = _('Vapi Usage Metrics')
+        db_table = 'vapi_usage_metrics'
+        unique_together = ['business', 'date']
+        indexes = [
+            models.Index(fields=['business', 'date']),
+            models.Index(fields=['date']),
+        ]
+    
+    def __str__(self):
+        return f"{self.business.name} - {self.date}: {self.total_calls} calls"

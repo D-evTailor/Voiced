@@ -44,6 +44,12 @@ class SharedAgentManager:
             'voice': {'provider': 'openai', 'voiceId': 'nova'},
             'model': {'provider': 'openai', 'model': 'gpt-4o-mini'},
             'serverUrl': f"{settings.VAPI_WEBHOOK_BASE_URL}/vapi/webhook/",
+            'serverUrlSecret': getattr(settings, 'VAPI_WEBHOOK_SECRET', None),
+            'endCallFunctionEnabled': True,
+            'recordingEnabled': True,
+            'maxDurationSeconds': 600,
+            'silenceTimeoutSeconds': 30,
+            'responseDelaySeconds': 0.4,
             'tools': self._get_shared_tools(),
             'systemMessage': self._get_shared_system_message(),
         }
@@ -54,26 +60,25 @@ class SharedAgentManager:
                 'type': 'function',
                 'function': {
                     'name': 'get_business_services',
-                    'description': 'Get available services for a business',
+                    'description': 'Get available services for the current business',
                     'parameters': {
                         'type': 'object',
-                        'properties': {
-                            'business_name': {'type': 'string', 'description': 'Name of the business'}
-                        }
+                        'properties': {},
+                        'required': []
                     }
                 }
             },
             {
                 'type': 'function',
                 'function': {
-                    'name': 'check_availability',
-                    'description': 'Check availability for a service',
+                    'name': 'check_service_availability',
+                    'description': 'Check availability slots for a specific service and date',
                     'parameters': {
                         'type': 'object',
                         'properties': {
-                            'service_name': {'type': 'string'},
+                            'service_name': {'type': 'string', 'description': 'Name of the service'},
                             'date': {'type': 'string', 'description': 'Date in YYYY-MM-DD format'},
-                            'time_preference': {'type': 'string', 'description': 'Preferred time'}
+                            'time_preference': {'type': 'string', 'description': 'Preferred time (morning, afternoon, evening)'}
                         },
                         'required': ['service_name', 'date']
                     }
@@ -83,28 +88,58 @@ class SharedAgentManager:
                 'type': 'function',
                 'function': {
                     'name': 'book_appointment',
-                    'description': 'Book an appointment',
+                    'description': 'Book an appointment for a client',
                     'parameters': {
                         'type': 'object',
                         'properties': {
-                            'service_name': {'type': 'string'},
+                            'service_name': {'type': 'string', 'description': 'Name of the service to book'},
                             'datetime': {'type': 'string', 'description': 'Appointment datetime in ISO format'},
-                            'client_name': {'type': 'string'},
-                            'client_phone': {'type': 'string'},
-                            'client_email': {'type': 'string'},
-                            'notes': {'type': 'string'}
+                            'client_name': {'type': 'string', 'description': 'Full name of the client'},
+                            'client_phone': {'type': 'string', 'description': 'Client phone number'},
+                            'client_email': {'type': 'string', 'description': 'Client email address'},
+                            'notes': {'type': 'string', 'description': 'Additional notes or requirements'}
                         },
                         'required': ['service_name', 'datetime', 'client_name', 'client_phone']
+                    }
+                }
+            },
+            {
+                'type': 'function',
+                'function': {
+                    'name': 'get_business_hours',
+                    'description': 'Get operating hours for the current business',
+                    'parameters': {
+                        'type': 'object',
+                        'properties': {
+                            'date': {'type': 'string', 'description': 'Date in YYYY-MM-DD format'}
+                        },
+                        'required': ['date']
                     }
                 }
             }
         ]
     
     def _get_shared_system_message(self) -> str:
-        return """Eres un asistente de reservas para múltiples negocios. 
-Tu objetivo es ayudar a los clientes a reservar citas de manera eficiente.
-Siempre sé cortés y profesional. Si necesitas información específica del negocio, 
-usa las herramientas disponibles. Confirma todos los detalles antes de hacer una reserva."""
+        return """Eres un asistente virtual especializado en reservas para múltiples negocios. 
+
+CONTEXTO IMPORTANTE:
+- Cada llamada pertenece a un negocio específico
+- Los servicios y horarios varían por negocio
+- Siempre confirma la información antes de reservar
+
+PROCESO DE RESERVA:
+1. Saluda cordialmente y pregunta en qué puedes ayudar
+2. Si el cliente quiere una reserva, usa get_business_services para mostrar opciones
+3. Una vez que elija un servicio, usa check_service_availability para fechas
+4. Confirma todos los datos antes de usar book_appointment
+5. Proporciona el número de referencia de la reserva
+
+IMPORTANTE:
+- Sé natural y conversacional 
+- Haz preguntas clarificadoras cuando sea necesario
+- Si no encuentras disponibilidad, ofrece alternativas
+- Siempre confirma la información del cliente antes de reservar
+- Habla en español de forma natural y profesional"""
 
 
 class TenantRegistrationService:
@@ -130,29 +165,41 @@ class TenantRegistrationService:
             return {'success': False, 'error': str(e)}
     
     def _provision_phone_number(self, business: Business, area_code: Optional[str]) -> Dict:
-        phone_result = self.client.buy_phone_number(
-            area_code=area_code,
-            name=f"{business.name} - {business.slug}"
-        )
+        phone_result = self.client.buy_phone_number(area_code=area_code)
         
-        metadata = {'tenant_id': str(business.id), 'business_slug': business.slug}
+        shared_agent_id = self.shared_agent.shared_agent_id
         
         self.client.update_phone_number(phone_result['id'], {
-            'assistantId': self.shared_agent.shared_agent_id,
-            'metadata': metadata
+            'assistantId': shared_agent_id,
+            'metadata': {
+                'tenant_id': str(business.id),
+                'business_name': business.name,
+                'business_slug': business.slug
+            }
         })
         
-        return phone_result
+        return {
+            'id': phone_result['id'],
+            'number': phone_result['number']
+        }
     
     def _create_vapi_configuration(self, business: Business, phone_result: Dict) -> VapiConfiguration:
+        from django.utils import timezone
         return VapiConfiguration.objects.create(
             business=business,
             phone_number_id=phone_result['id'],
+            phone_number=phone_result['number'],
             assistant_id=self.shared_agent.shared_agent_id,
             assistant_name='Shared Multi-Tenant Assistant',
             server_url=f"{settings.VAPI_WEBHOOK_BASE_URL}/vapi/webhook/",
-            server_secret=settings.VAPI_WEBHOOK_SECRET,
-            is_shared_agent=True
+            server_secret=getattr(settings, 'VAPI_WEBHOOK_SECRET', ''),
+            is_shared_agent=True,
+            metadata={
+                'tenant_id': str(business.id),
+                'business_name': business.name,
+                'business_slug': business.slug,
+                'setup_date': timezone.now().isoformat()
+            }
         )
 
 

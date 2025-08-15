@@ -95,10 +95,14 @@ class FunctionCallHandler(BaseCallEventHandler):
             service = AvailabilityQueryService(call.business)
             return service.get_available_services()
         
-        elif function_name == 'check_availability':
+        elif function_name == 'check_service_availability':
             service = AvailabilityQueryService(call.business)
+            service_id = self._find_service_id_by_name(call.business, parameters.get('service_name', ''))
+            if not service_id:
+                return {'error': f"Servicio '{parameters.get('service_name')}' no encontrado"}
+            
             return service.check_availability(
-                self._find_service_id_by_name(call.business, parameters.get('service_name', '')),
+                service_id,
                 parameters.get('date'),
                 None
             )
@@ -117,6 +121,44 @@ class FunctionCallHandler(BaseCallEventHandler):
             )
             
             return booking_service.book_appointment(booking_data)
+        
+        elif function_name == 'get_business_hours':
+            date_str = parameters.get('date')
+            if date_str:
+                try:
+                    from datetime import datetime
+                    date_obj = datetime.fromisoformat(date_str).date()
+                    day_of_week = date_obj.weekday()
+                    
+                    hours = call.business.business_hours.filter(
+                        day_of_week=day_of_week
+                    ).first()
+                    
+                    if hours and not hours.is_closed:
+                        return {
+                            'open': True,
+                            'open_time': str(hours.open_time),
+                            'close_time': str(hours.close_time),
+                            'day': hours.get_day_of_week_display()
+                        }
+                    else:
+                        return {
+                            'open': False,
+                            'day': ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'][day_of_week]
+                        }
+                except ValueError:
+                    return {'error': 'Formato de fecha inválido'}
+            
+            return {'error': 'Fecha requerida'}
+        
+        # Legacy support
+        elif function_name == 'check_availability':
+            service = AvailabilityQueryService(call.business)
+            return service.check_availability(
+                self._find_service_id_by_name(call.business, parameters.get('service_name', '')),
+                parameters.get('date'),
+                None
+            )
         
         else:
             raise ValueError(f"Unknown function: {function_name}")

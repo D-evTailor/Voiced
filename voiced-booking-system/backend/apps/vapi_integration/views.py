@@ -5,14 +5,17 @@ from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
+from django.db.models import Sum, Count
+from datetime import date, datetime, timedelta
 from apps.core.permissions import IsBusinessMember
 from apps.businesses.models import Business
-from .models import VapiConfiguration, VapiCall
+from .models import VapiConfiguration, VapiCall, VapiUsageMetrics
 from .serializers import VapiConfigurationSerializer, VapiCallSerializer
 from .security import WebhookSecurityManager
 from .processors import WebhookProcessor
 from .api_client import VapiBusinessService
 from .value_objects import BusinessSlug
+from .tasks import calculate_daily_usage_metrics, generate_monthly_billing_report
 import logging
 
 logger = logging.getLogger(__name__)
@@ -66,6 +69,103 @@ class VapiConfigurationViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             logger.error(f"Tenant registration failed: {e}")
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['get'])
+    def usage_metrics(self, request):
+        """Get usage metrics for billing purposes"""
+        business_slug = request.GET.get('business_slug')
+        if not business_slug:
+            return Response({
+                'error': 'Business slug is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            business = Business.objects.get(slug=business_slug)
+            
+            # Check permissions
+            if not request.user.business_memberships.filter(business=business, is_active=True).exists():
+                return Response({
+                    'error': 'Access denied'
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            date_from = request.GET.get('from', (date.today() - timedelta(days=30)).isoformat())
+            date_to = request.GET.get('to', date.today().isoformat())
+            
+            metrics = VapiUsageMetrics.objects.filter(
+                business=business,
+                date__range=[date_from, date_to]
+            ).aggregate(
+                total_calls=Sum('total_calls'),
+                total_minutes=Sum('total_minutes'),
+                total_function_calls=Sum('total_function_calls'),
+                successful_bookings=Sum('successful_bookings'),
+                failed_bookings=Sum('failed_bookings'),
+                estimated_cost=Sum('estimated_cost')
+            )
+            
+            daily_breakdown = list(
+                VapiUsageMetrics.objects.filter(
+                    business=business,
+                    date__range=[date_from, date_to]
+                ).values('date', 'total_calls', 'total_minutes', 'estimated_cost')
+                .order_by('date')
+            )
+            
+            return Response({
+                'business': business.name,
+                'period': {'from': date_from, 'to': date_to},
+                'summary': metrics,
+                'daily_breakdown': daily_breakdown
+            })
+            
+        except Business.DoesNotExist:
+            return Response({
+                'error': 'Business not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Error fetching usage metrics: {e}")
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['post'])
+    def generate_billing_report(self, request):
+        """Generate monthly billing report"""
+        business_id = request.data.get('business_id')
+        year = request.data.get('year', date.today().year)
+        month = request.data.get('month', date.today().month)
+        
+        if not business_id:
+            return Response({
+                'error': 'Business ID is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            business = Business.objects.get(id=business_id)
+            
+            # Check permissions
+            if not request.user.business_memberships.filter(business=business, is_active=True).exists():
+                return Response({
+                    'error': 'Access denied'
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            # Queue task for report generation
+            task = generate_monthly_billing_report.delay(business_id, year, month)
+            
+            return Response({
+                'task_id': task.id,
+                'message': f'Billing report generation started for {business.name} - {year}-{month:02d}'
+            })
+            
+        except Business.DoesNotExist:
+            return Response({
+                'error': 'Business not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Error generating billing report: {e}")
             return Response({
                 'error': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
