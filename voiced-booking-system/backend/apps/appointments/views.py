@@ -57,6 +57,24 @@ class AppointmentViewSet(StatusActionsMixin, FilterActionsMixin, TenantViewSet):
     def complete(self, request, pk=None):
         result = self.complete_action(request, pk)
         return success_response(data={'status': result['status']}, message=result['message'])
+    
+    @action(detail=False, methods=['get'])
+    def today(self, request):
+        queryset = self.get_today_queryset(request)
+        
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return success_response(data=serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def upcoming(self, request):
+        queryset = self.get_upcoming_queryset(request)
+        serializer = self.get_serializer(queryset, many=True)
+        return success_response(data=serializer.data)
 
 
 class AvailabilityView(APIView, TimeCalculationMixin):

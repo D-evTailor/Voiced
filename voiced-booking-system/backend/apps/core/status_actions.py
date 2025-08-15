@@ -6,30 +6,14 @@ from .exceptions import success_response
 
 
 class StatusActionsMixin:
-    status_transitions = {
-        'pending': ['confirmed', 'cancelled'],
-        'confirmed': ['in_progress', 'cancelled', 'no_show'],
-        'in_progress': ['completed', 'cancelled'],
-        'completed': [],
-        'cancelled': [],
-        'no_show': [],
-    }
-    
-    def _validate_status_transition(self, instance, new_status):
-        current_status = getattr(instance, 'status', None)
-        if current_status and new_status not in self.status_transitions.get(current_status, []):
-            raise ValidationError(f"Cannot transition from {current_status} to {new_status}")
-    
     def confirm_action(self, request, pk=None):
         instance = self.get_object()
-        self._validate_status_transition(instance, 'confirmed')
         instance.status = 'confirmed'
         instance.save(update_fields=['status'])
         return {'status': instance.status, 'message': f"{instance._meta.verbose_name} confirmed"}
     
     def cancel_action(self, request, pk=None):
         instance = self.get_object()
-        self._validate_status_transition(instance, 'cancelled')
         instance.status = 'cancelled'
         reason = request.data.get('reason', '')
         update_fields = ['status']
@@ -43,7 +27,6 @@ class StatusActionsMixin:
     
     def complete_action(self, request, pk=None):
         instance = self.get_object()
-        self._validate_status_transition(instance, 'completed')
         instance.status = 'completed'
         update_fields = ['status']
         

@@ -46,15 +46,6 @@ class IdempotencyMixin:
         response = super().create(request, *args, **kwargs)
         self.store_idempotent_response(request, response)
         return response
-    
-    def update(self, request, *args, **kwargs):
-        cached_response = self.check_idempotency(request)
-        if cached_response:
-            return cached_response
-        
-        response = super().update(request, *args, **kwargs)
-        self.store_idempotent_response(request, response)
-        return response
 
 
 class ResourceActionsMixin:
