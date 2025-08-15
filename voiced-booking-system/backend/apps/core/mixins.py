@@ -192,6 +192,10 @@ UUIDMixin = BaseFieldsMixin
 TimestampMixin = BaseFieldsMixin
 VersionMixin = AuditFieldsMixin
 ActiveMixin = BaseFieldsMixin
-AuditMixin = lambda: type('AuditMixin', (BaseFieldsMixin, AuditFieldsMixin), {'Meta': type('Meta', (), {'abstract': True})})
+
+class AuditMixin(BaseFieldsMixin, AuditFieldsMixin):
+    class Meta:
+        abstract = True
+
 CountMixin = BusinessStatsMixin
 ClientStatsMixin = BusinessStatsMixin

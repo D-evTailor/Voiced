@@ -1,6 +1,5 @@
 from rest_framework import permissions
 from rest_framework.decorators import action
-from rest_framework.response import Response
 from apps.core.viewsets import TenantViewSet, OptimizedViewSetMixin
 from apps.core.permissions import BusinessManagerPermission, BusinessStaffPermission
 from apps.core.exceptions import success_response, error_response

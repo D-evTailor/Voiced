@@ -1,7 +1,6 @@
 from rest_framework import permissions
 from rest_framework.views import APIView
 from rest_framework.decorators import action
-from rest_framework.response import Response
 from datetime import datetime, timedelta
 from django.utils import timezone
 from apps.core.viewsets import TenantViewSet
@@ -78,13 +77,13 @@ class AppointmentViewSet(StatusActionsMixin, FilterActionsMixin, TenantViewSet):
             return self.get_paginated_response(serializer.data)
         
         serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+        return success_response(data=serializer.data)
     
     @action(detail=False, methods=['get'])
     def upcoming(self, request):
         queryset = self.get_upcoming_queryset(request)
         serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+        return success_response(data=serializer.data)
 
 
 class AvailabilityView(APIView):
