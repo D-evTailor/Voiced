@@ -6,6 +6,13 @@ from .constants import STATUS_TRANSITIONS
 from .utils import PHONE_REGEX_VALIDATOR
 
 
+def get_localized_day_name(day_of_week):
+    from .choices import DAYS_OF_WEEK_CHOICES
+    
+    day_dict = dict(DAYS_OF_WEEK_CHOICES)
+    return str(day_dict.get(day_of_week, _('Unknown')))
+
+
 def get_display_name(obj, name_fields=None):
     if name_fields is None:
         name_fields = ['first_name', 'last_name', 'name', 'email', 'phone']

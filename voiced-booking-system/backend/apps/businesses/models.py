@@ -91,9 +91,10 @@ class BusinessHours(models.Model):
         ordering = ['business', 'day_of_week']
     
     def __str__(self):
-        day_name = self.get_day_of_week_display()
+        from apps.core.helpers import get_localized_day_name
+        day_name = get_localized_day_name(self.day_of_week)
         if self.is_closed or not self.open_time or not self.close_time:
-            return f"{self.business.name} - {day_name}: Closed"
+            return f"{self.business.name} - {day_name}: {_('Closed')}"
         return f"{self.business.name} - {day_name}: {self.open_time} - {self.close_time}"
     
     @property

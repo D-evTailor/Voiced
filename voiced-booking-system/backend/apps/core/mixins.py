@@ -103,20 +103,9 @@ class SoftDeleteMixin(models.Model):
         return self.deleted_at is not None
 
 
-class TenantQuerySet(models.QuerySet):
-    def for_business(self, business):
-        return self.filter(business=business)
-
-
-class TenantManager(models.Manager):
-    def get_queryset(self):
-        return TenantQuerySet(self.model, using=self._db)
-    
-    def for_business(self, business):
-        return self.get_queryset().for_business(business)
-
-
 class TenantMixin(models.Model):
+    from .managers import TenantManager
+    
     business = models.ForeignKey(
         'businesses.Business',
         on_delete=models.CASCADE,

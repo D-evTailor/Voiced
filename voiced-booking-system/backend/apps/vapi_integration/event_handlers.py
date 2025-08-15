@@ -22,6 +22,16 @@ class EventHandler(ABC):
 class BaseCallEventHandler(EventHandler):
     def _log_event(self, event_type: str, call: VapiCall, details: str = ""):
         logger.info(f"{event_type} event for call {call.call_id} {details}")
+    
+    def _create_success_response(self, call: VapiCall, status: str, additional_data: Dict = None) -> Dict[str, Any]:
+        response = {
+            'status': status,
+            'call_id': call.call_id,
+            'business_id': str(call.business.id)
+        }
+        if additional_data:
+            response.update(additional_data)
+        return response
 
 
 class CallStartedHandler(BaseCallEventHandler):
@@ -30,7 +40,7 @@ class CallStartedHandler(BaseCallEventHandler):
     
     def handle(self, call: VapiCall, event_data: Dict[str, Any]) -> Dict[str, Any]:
         self._log_event("Call started", call)
-        return {'status': 'call_started', 'call_id': call.call_id}
+        return self._create_success_response(call, 'call_started')
 
 
 class CallEndedHandler(BaseCallEventHandler):
@@ -142,9 +152,11 @@ class FunctionCallHandler(BaseCallEventHandler):
                             'day': hours.get_day_of_week_display()
                         }
                     else:
+                        from django.utils.formats import date_format
+                        day_name = date_format(date_obj, 'l')
                         return {
                             'open': False,
-                            'day': ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'][day_of_week]
+                            'day': day_name
                         }
                 except ValueError:
                     return {'error': 'Formato de fecha inválido'}

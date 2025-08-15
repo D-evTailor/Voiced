@@ -150,6 +150,21 @@ class TenantRegistrationService:
     @transaction.atomic
     def register_tenant(self, business: Business, area_code: Optional[str] = None) -> Dict:
         try:
+            existing_config = VapiConfiguration.objects.filter(
+                business=business, 
+                is_active=True
+            ).first()
+            
+            if existing_config and existing_config.phone_number_id:
+                logger.warning(f"Business {business.name} already has Vapi configuration")
+                return {
+                    'success': True,
+                    'business_id': business.id,
+                    'phone_number': existing_config.phone_number,
+                    'phone_number_id': existing_config.phone_number_id,
+                    'message': 'Using existing configuration'
+                }
+            
             phone_result = self._provision_phone_number(business, area_code)
             config_result = self._create_vapi_configuration(business, phone_result)
             

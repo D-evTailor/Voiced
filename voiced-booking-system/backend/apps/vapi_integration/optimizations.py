@@ -1,4 +1,4 @@
-from apps.core.cache import cache_service, CacheService
+from apps.core.cache import cache_service
 
 
 class VapiCacheKeys:
@@ -21,11 +21,3 @@ class VapiCacheKeys:
     @staticmethod
     def business_pattern(business_id: int) -> str:
         return f"vapi:*:{business_id}:*"
-
-
-class VapiCacheService(CacheService):
-    def invalidate_business_cache(self, business_id: int):
-        self.invalidate_pattern(VapiCacheKeys.business_pattern(business_id))
-
-
-vapi_cache_service = VapiCacheService()
