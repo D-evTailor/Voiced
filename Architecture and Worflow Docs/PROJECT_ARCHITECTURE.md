@@ -452,59 +452,25 @@ frontend/
 
 ## 🤖 **VAPI INTEGRATION ARCHITECTURE**
 
-### **Complete Voice Agent System**
+> **📖 Complete Technical Documentation**: See [VAPI System Flows](../docs/VAPI_SYSTEM_FLOWS.md) for detailed implementation patterns, API flows, and database schemas.
 
-VoiceAppoint implements a sophisticated multi-business voice agent system using a **shared agent architecture** where a single VAPI agent handles calls for multiple businesses with intelligent context switching.
+### **Core Architecture Decision**
 
-#### **Key Components:**
-
-```
-🏢 Business Phone → 📞 VAPI Agent → 🔗 Webhook → ⚙️ Django → 💾 Database
-                                      ↓
-                                📋 Event Handler Registry
-                                      ↓
-                            🛠️ Function Call Handlers
-                                      ↓
-                              📊 Domain Services
-```
-
-#### **Integration Features:**
-
-✅ **Shared Agent Architecture**: Single VAPI agent serves multiple businesses  
-✅ **Metadata-Based Routing**: Business identification via phone number metadata  
-✅ **Function Call System**: Dynamic business logic execution  
-✅ **Real-time Processing**: Webhook-based event handling  
-✅ **Multi-business Support**: Complete data isolation per business  
-✅ **Conversation Analytics**: Call tracking and analysis  
-✅ **Appointment Integration**: Direct booking system integration  
-
-#### **Available Functions:**
-
-| Function | Description | Usage |
-|----------|-------------|-------|
-| `get_business_services` | Retrieve available services | Service discovery |
-| `check_service_availability` | Check time slot availability | Scheduling |
-| `book_appointment` | Create appointment booking | Reservation |
-| `get_business_hours` | Get operating hours | Schedule info |
-
-#### **Data Flow:**
-
-1. **Call Reception** → VAPI receives call with business context
-2. **Business Identification** → Metadata extraction identifies business
-3. **Context Loading** → Business services and configuration loaded
-4. **Function Execution** → Agent calls business-specific functions
-5. **Data Processing** → Domain services handle business logic
-6. **Response Generation** → Structured responses sent to agent
-7. **Call Completion** → Final processing and analytics
-
-#### **API Endpoints:**
+**Single Shared Agent Approach:**
+- One VAPI agent serves ALL businesses
+- Business identification through call metadata
+- Dynamic routing based on business context
+- Scalable and cost-effective solution
 
 - `POST /api/v1/vapi_integration/webhook/` - Main webhook processor
 - `GET /api/v1/vapi_integration/configs/` - Configuration management
 - `GET /api/v1/vapi_integration/calls/` - Call history and analytics
 - `POST /api/v1/vapi_integration/business/{id}/calls/outbound/` - Outbound calls
 
-**📚 Complete Documentation:** See `VAPI_INTEGRATION_API_DOC.md` for detailed API reference, examples, and implementation details.
+### **📚 Documentation References**
+
+- **[VAPI System Flows](../docs/VAPI_SYSTEM_FLOWS.md)** - Complete technical flows and patterns
+- **[VAPI Integration API](../docs/VAPI_INTEGRATION_API_DOC.md)** - Detailed API reference and examples
 
 ---
 
