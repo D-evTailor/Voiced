@@ -1,57 +1,24 @@
 from django.conf import settings
-from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 import uuid
+from .helpers import format_duration, calculate_end_time, safe_decimal_add
 
 
-class UUIDMixin(models.Model):
+class BaseFieldsMixin(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    
-    class Meta:
-        abstract = True
-
-
-class TimestampMixin(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
-    class Meta:
-        abstract = True
-
-
-class VersionMixin(models.Model):
-    version = models.PositiveIntegerField(default=1)
-    
-    class Meta:
-        abstract = True
-    
-    def save(self, *args, **kwargs):
-        if self.pk:
-            self.version += 1
-        super().save(*args, **kwargs)
-
-
-class OrderMixin(models.Model):
-    order = models.PositiveIntegerField(
-        _('display order'),
-        default=0,
-        validators=[MinValueValidator(0)]
-    )
-    
-    class Meta:
-        abstract = True
-
-
-class ActiveMixin(models.Model):
     is_active = models.BooleanField(_('active'), default=True)
     
     class Meta:
         abstract = True
 
 
-class AuditMixin(TimestampMixin, VersionMixin):
+class AuditFieldsMixin(models.Model):
+    version = models.PositiveIntegerField(default=1)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -69,6 +36,11 @@ class AuditMixin(TimestampMixin, VersionMixin):
     
     class Meta:
         abstract = True
+    
+    def save(self, *args, **kwargs):
+        if self.pk:
+            self.version += 1
+        super().save(*args, **kwargs)
 
 
 class SoftDeleteQuerySet(models.QuerySet):
@@ -116,12 +88,12 @@ class SoftDeleteMixin(models.Model):
         self.deleted_at = timezone.now()
         if user:
             self.deleted_by = user
-        self.save()
+        self.save(update_fields=['deleted_at', 'deleted_by'])
     
     def restore(self):
         self.deleted_at = None
         self.deleted_by = None
-        self.save()
+        self.save(update_fields=['deleted_at', 'deleted_by'])
     
     def hard_delete(self):
         super().delete()
@@ -157,44 +129,47 @@ class TenantMixin(models.Model):
         abstract = True
 
 
-class BaseModel(UUIDMixin, AuditMixin, SoftDeleteMixin, TenantMixin, ActiveMixin):
-    class Meta:
-        abstract = True
-
-
-class SimpleModel(UUIDMixin, TimestampMixin, ActiveMixin):
-    class Meta:
-        abstract = True
-
-
-class BusinessModel(UUIDMixin, TimestampMixin, VersionMixin, ActiveMixin):
-    class Meta:
-        abstract = True
-
-
-class CountMixin(models.Model):
-    class Meta:
-        abstract = True
+class OrderMixin(models.Model):
+    order = models.PositiveIntegerField(
+        _('display order'),
+        default=0,
+        validators=[MinValueValidator(0)]
+    )
     
-    @property
-    def active_count(self):
-        return getattr(self, self._count_relation).filter(is_active=True).count()
+    class Meta:
+        abstract = True
+        ordering = ['order']
 
 
-class ClientStatsMixin(models.Model):
+class BaseModel(BaseFieldsMixin, AuditFieldsMixin, SoftDeleteMixin, TenantMixin):
+    class Meta:
+        abstract = True
+
+
+class SimpleModel(BaseFieldsMixin):
+    class Meta:
+        abstract = True
+
+
+class BusinessModel(BaseFieldsMixin, AuditFieldsMixin):
+    class Meta:
+        abstract = True
+
+
+class BusinessStatsMixin(models.Model):
     class Meta:
         abstract = True
     
     def update_client_stats(self):
         if hasattr(self, 'client') and self.client:
-            from decimal import Decimal
             appointments = self.client.appointments.filter(status__in=['completed', 'confirmed'])
             self.client.total_appointments = appointments.count()
-            self.client.total_spent = sum(apt.final_price or Decimal('0') for apt in appointments)
-            self.client.last_appointment_date = appointments.order_by('-start_time').first()
-            if self.client.last_appointment_date:
-                self.client.last_appointment_date = self.client.last_appointment_date.start_time
-            self.client.save()
+            self.client.total_spent = safe_decimal_add(
+                *[apt.final_price for apt in appointments if apt.final_price]
+            )
+            last_apt = appointments.order_by('-start_time').first()
+            self.client.last_appointment_date = last_apt.start_time if last_apt else None
+            self.client.save(update_fields=['total_appointments', 'total_spent', 'last_appointment_date'])
 
 
 class TimeCalculationMixin(models.Model):
@@ -203,22 +178,20 @@ class TimeCalculationMixin(models.Model):
     
     @property
     def end_time(self):
-        if hasattr(self, 'start_time') and hasattr(self, 'service') and self.start_time and self.service:
-            from datetime import timedelta
-            return self.start_time + timedelta(minutes=self.service.duration)
+        if hasattr(self, 'start_time') and hasattr(self, 'service'):
+            return calculate_end_time(self.start_time, getattr(self.service, 'duration', None))
         return None
     
     @property
     def duration_display(self):
-        if hasattr(self, 'duration'):
-            hours, minutes = divmod(self.duration, 60)
-            if hours:
-                return f"{hours}h {minutes}m" if minutes else f"{hours}h"
-            return f"{minutes}m"
-        return None
-    
-    @property
-    def total_time_required(self):
-        if hasattr(self, 'duration') and hasattr(self, 'buffer_time'):
-            return self.duration + self.buffer_time
-        return getattr(self, 'duration', 0)
+        duration = getattr(self, 'duration', None)
+        return format_duration(duration)
+
+# Legacy aliases for backward compatibility
+UUIDMixin = BaseFieldsMixin
+TimestampMixin = BaseFieldsMixin
+VersionMixin = AuditFieldsMixin
+ActiveMixin = BaseFieldsMixin
+AuditMixin = lambda: type('AuditMixin', (BaseFieldsMixin, AuditFieldsMixin), {'Meta': type('Meta', (), {'abstract': True})})
+CountMixin = BusinessStatsMixin
+ClientStatsMixin = BusinessStatsMixin

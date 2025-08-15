@@ -1,11 +1,13 @@
 from rest_framework import permissions
-from rest_framework.decorators import action
 from rest_framework.views import APIView
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from datetime import datetime, timedelta
 from django.utils import timezone
 from apps.core.viewsets import TenantViewSet
 from apps.core.permissions import BusinessStaffPermission
 from apps.core.exceptions import success_response, error_response
+from apps.core.status_actions import StatusActionsMixin, FilterActionsMixin
 from .models import Appointment, Client
 from .serializers import (
     AppointmentSerializer, AppointmentCreateSerializer, AppointmentListSerializer,
@@ -20,32 +22,27 @@ class ClientViewSet(TenantViewSet):
     search_fields = ['first_name', 'last_name', 'email', 'phone']
     filterset_fields = ['email', 'phone']
     ordering = ['first_name', 'last_name']
-    
-    @action(detail=True, methods=['get'])
-    def appointments(self, request, pk=None):
-        client = self.get_object()
-        appointments = client.appointments.all()
-        serializer = AppointmentListSerializer(appointments, many=True)
-        return success_response(data=serializer.data)
 
 
-class AppointmentViewSet(TenantViewSet):
+class AppointmentViewSet(StatusActionsMixin, FilterActionsMixin, TenantViewSet):
     queryset = Appointment.objects.all()
     serializer_class = AppointmentSerializer
     permission_classes = [permissions.IsAuthenticated, BusinessStaffPermission]
     filterset_fields = ['service', 'client', 'status', 'start_time__date']
     ordering = ['-start_time']
+    date_field = 'start_time'
+    status_field = 'status'
+    upcoming_statuses = ['pending', 'confirmed']
     
     def get_serializer_class(self):
-        if self.action == 'create':
-            return AppointmentCreateSerializer
-        elif self.action == 'list':
-            return AppointmentListSerializer
-        return AppointmentSerializer
+        action_serializers = {
+            'create': AppointmentCreateSerializer,
+            'list': AppointmentListSerializer,
+        }
+        return action_serializers.get(self.action, AppointmentSerializer)
     
     def get_queryset(self):
         queryset = super().get_queryset()
-        
         date_from = self.request.query_params.get('date_from')
         date_to = self.request.query_params.get('date_to')
         
@@ -53,57 +50,41 @@ class AppointmentViewSet(TenantViewSet):
             queryset = queryset.filter(start_time__gte=date_from)
         if date_to:
             queryset = queryset.filter(start_time__lte=date_to)
-            
+        
         return queryset
     
     @action(detail=True, methods=['patch'])
     def confirm(self, request, pk=None):
-        appointment = self.get_object()
-        appointment.status = 'confirmed'
-        appointment.save()
-        return success_response(
-            data={'status': appointment.status},
-            message="Appointment confirmed"
-        )
+        result = self.confirm_action(request, pk)
+        return success_response(data={'status': result['status']}, message=result['message'])
     
     @action(detail=True, methods=['patch'])
     def cancel(self, request, pk=None):
-        appointment = self.get_object()
-        appointment.status = 'cancelled'
-        appointment.cancellation_reason = request.data.get('reason', '')
-        appointment.save()
-        return success_response(
-            data={'status': appointment.status},
-            message="Appointment cancelled"
-        )
+        result = self.cancel_action(request, pk)
+        return success_response(data={'status': result['status']}, message=result['message'])
     
     @action(detail=True, methods=['patch'])
     def complete(self, request, pk=None):
-        appointment = self.get_object()
-        appointment.status = 'completed'
-        appointment.end_time = timezone.now()
-        appointment.save()
-        return success_response(
-            data={'status': appointment.status},
-            message="Appointment completed"
-        )
+        result = self.complete_action(request, pk)
+        return success_response(data={'status': result['status']}, message=result['message'])
     
     @action(detail=False, methods=['get'])
     def today(self, request):
-        today = timezone.now().date()
-        appointments = self.get_queryset().filter(start_time__date=today)
-        serializer = AppointmentListSerializer(appointments, many=True)
-        return success_response(data=serializer.data)
+        queryset = self.get_today_queryset(request)
+        
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
     
     @action(detail=False, methods=['get'])
     def upcoming(self, request):
-        now = timezone.now()
-        appointments = self.get_queryset().filter(
-            start_time__gte=now,
-            status__in=['scheduled', 'confirmed']
-        )[:10]
-        serializer = AppointmentListSerializer(appointments, many=True)
-        return success_response(data=serializer.data)
+        queryset = self.get_upcoming_queryset(request)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class AvailabilityView(APIView):
@@ -148,7 +129,7 @@ class AvailabilityView(APIView):
                 service=service,
                 start_time__lt=slot_end,
                 start_time__gte=current_time,
-                status__in=['scheduled', 'confirmed']
+                status__in=['pending', 'confirmed']
             ).exists():
                 slots.append(current_time.strftime('%H:%M'))
             

@@ -2,8 +2,8 @@ from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from apps.core.mixins import BusinessModel, TimestampMixin, CountMixin
-from apps.core.utils import PHONE_REGEX_VALIDATOR, CURRENCY_CHOICES, BUSINESS_TYPE_CHOICES
-from apps.core.choices import LANGUAGE_CHOICES
+from apps.core.utils import PHONE_REGEX_VALIDATOR
+from apps.core.choices import CURRENCY_CHOICES, BUSINESS_TYPE_CHOICES, LANGUAGE_CHOICES
 
 
 class Business(BusinessModel, CountMixin):

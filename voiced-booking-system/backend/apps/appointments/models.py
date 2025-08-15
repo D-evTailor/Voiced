@@ -2,7 +2,8 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import EmailValidator
 from apps.core.mixins import BaseModel, ClientStatsMixin
-from apps.core.utils import generate_unique_reference, APPOINTMENT_STATUS_CHOICES, APPOINTMENT_SOURCE_CHOICES, PAYMENT_STATUS_CHOICES
+from apps.core.utils import generate_unique_reference
+from apps.core.choices import APPOINTMENT_STATUS_CHOICES, APPOINTMENT_SOURCE_CHOICES, PAYMENT_STATUS_CHOICES
 
 
 class Appointment(BaseModel, ClientStatsMixin):

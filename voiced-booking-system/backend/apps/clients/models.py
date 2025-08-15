@@ -4,6 +4,7 @@ from apps.core.mixins import BaseModel
 from apps.core.managers import TenantManager
 from apps.core.utils import PHONE_REGEX_VALIDATOR
 from apps.core.choices import LANGUAGE_CHOICES
+from apps.core.helpers import get_display_name, normalize_phone_number
 
 
 class Client(BaseModel):
@@ -51,15 +52,15 @@ class Client(BaseModel):
         ordering = ['-created_at']
     
     def __str__(self):
-        return f"{self.get_full_name()} - {self.business.name}"
+        return f"{self.get_display_name()} - {self.business.name}"
+    
+    def save(self, *args, **kwargs):
+        if self.phone:
+            self.phone = normalize_phone_number(self.phone)
+        super().save(*args, **kwargs)
     
     def get_full_name(self):
-        if self.first_name or self.last_name:
-            return f"{self.first_name} {self.last_name}".strip()
-        return self.email or self.phone or f"Client #{self.id[:8]}"
+        return get_display_name(self, ['first_name', 'last_name'])
     
     def get_display_name(self):
-        full_name = self.get_full_name()
-        if full_name != self.email and full_name != self.phone:
-            return full_name
-        return f"{full_name[:20]}..." if len(full_name) > 20 else full_name
+        return get_display_name(self, ['first_name', 'last_name', 'email', 'phone'])

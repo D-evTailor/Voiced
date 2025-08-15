@@ -1,5 +1,66 @@
 from django.utils.translation import gettext_lazy as _
 
+LANGUAGE_CHOICES = [
+    ('es', _('Spanish')),
+    ('en', _('English'))
+]
+
+CURRENCY_CHOICES = [
+    ('EUR', 'Euro'),
+    ('USD', 'US Dollar'),
+    ('GBP', 'British Pound'),
+]
+
+BUSINESS_TYPE_CHOICES = [
+    ('salon', _('Hair Salon')),
+    ('clinic', _('Medical Clinic')),
+    ('restaurant', _('Restaurant')),
+    ('spa', _('Spa')),
+    ('dental', _('Dental Clinic')),
+    ('fitness', _('Fitness Center')),
+    ('other', _('Other'))
+]
+
+APPOINTMENT_STATUS_CHOICES = [
+    ('pending', _('Pending')),
+    ('confirmed', _('Confirmed')),
+    ('in_progress', _('In Progress')),
+    ('completed', _('Completed')),
+    ('cancelled', _('Cancelled')),
+    ('no_show', _('No Show')),
+]
+
+APPOINTMENT_SOURCE_CHOICES = [
+    ('online', _('Online')),
+    ('phone', _('Phone')),
+    ('walk_in', _('Walk-in')),
+    ('vapi', _('Voice AI')),
+    ('admin', _('Admin')),
+]
+
+PAYMENT_STATUS_CHOICES = [
+    ('pending', _('Pending')),
+    ('paid', _('Paid')),
+    ('partial', _('Partial')),
+    ('failed', _('Failed')),
+    ('refunded', _('Refunded')),
+]
+
+CLIENT_SOURCE_CHOICES = [
+    ('website', _('Website')),
+    ('referral', _('Referral')),
+    ('social_media', _('Social Media')),
+    ('vapi', _('Voice AI')),
+    ('walk_in', _('Walk-in')),
+    ('admin', _('Admin')),
+]
+
+RESOURCE_TYPE_CHOICES = [
+    ('staff', _('Staff')),
+    ('room', _('Room')),
+    ('equipment', _('Equipment')),
+]
+
 VAPI_CALL_STATUS_CHOICES = [
     ('scheduled', _('Scheduled')),
     ('queued', _('Queued')),
@@ -38,9 +99,4 @@ VAPI_ENDED_REASON_CHOICES = [
     ('assistant-forwarded-call', _('Assistant forwarded call')),
     ('assistant-join-timeout', _('Assistant join timeout')),
     ('assistant-left', _('Assistant left'))
-]
-
-LANGUAGE_CHOICES = [
-    ('es', _('Spanish')),
-    ('en', _('English'))
 ]
