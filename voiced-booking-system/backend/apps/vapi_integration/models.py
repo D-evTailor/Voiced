@@ -3,7 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from django.core.validators import MinValueValidator, MaxValueValidator
 from apps.core.mixins import BaseModel, SimpleModel
 from apps.core.choices import VAPI_CALL_STATUS_CHOICES, VAPI_CALL_TYPE_CHOICES, VAPI_ENDED_REASON_CHOICES, LANGUAGE_CHOICES
-from .optimizations import vapi_cache_service, VapiCacheKeys
+from .optimizations import VapiConfigManager, VapiCacheKeys
 
 
 class VapiConfiguration(BaseModel):
@@ -66,12 +66,12 @@ class VapiConfiguration(BaseModel):
                 'business_slug': self.business.slug
             }
         super().save(*args, **kwargs)
-        vapi_cache_service.invalidate_pattern(VapiCacheKeys.business_config(self.business_id))
+        VapiConfigManager.invalidate_business_cache(self.business_id)
     
     def delete(self, *args, **kwargs):
         business_id = self.business_id
         super().delete(*args, **kwargs)
-        vapi_cache_service.invalidate_pattern(VapiCacheKeys.business_config(business_id))
+        VapiConfigManager.invalidate_business_cache(business_id)
     
     @property
     def assistant_config(self):

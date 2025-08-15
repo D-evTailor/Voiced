@@ -284,7 +284,7 @@ SENDGRID_API_KEY = config('SENDGRID_API_KEY', default='')
 
 # Sentry Configuration
 SENTRY_DSN = config('SENTRY_DSN', default='')
-if SENTRY_DSN:
+if SENTRY_DSN and SENTRY_DSN != 'your_sentry_dsn' and SENTRY_DSN.startswith('https://'):
     import sentry_sdk
     from sentry_sdk.integrations.django import DjangoIntegration
     from sentry_sdk.integrations.celery import CeleryIntegration
@@ -292,8 +292,8 @@ if SENTRY_DSN:
     sentry_sdk.init(
         dsn=SENTRY_DSN,
         integrations=[
-            DjangoIntegration(auto_enabling=True),
-            CeleryIntegration(auto_enabling=True),
+            DjangoIntegration(),
+            CeleryIntegration(),
         ],
         traces_sample_rate=0.1,
         send_default_pii=True,

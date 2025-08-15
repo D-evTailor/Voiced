@@ -2,7 +2,7 @@ from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.contrib.auth.base_user import BaseUserManager
 from django.core.validators import EmailValidator
 from django.db import models
-from django.utils import timezone
+from django.utils import timezone as django_timezone
 from django.utils.translation import gettext_lazy as _
 from apps.core.mixins import BaseFieldsMixin, SimpleModel
 from apps.core.choices import LANGUAGE_CHOICES
@@ -38,7 +38,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_verified = models.BooleanField(_('verified'), default=False)
     locale = models.CharField(_('locale'), max_length=10, choices=LANGUAGE_CHOICES, default='es')
     timezone = models.CharField(_('timezone'), max_length=50, default='Europe/Madrid')
-    date_joined = models.DateTimeField(_('date joined'), default=timezone.now)
+    date_joined = models.DateTimeField(_('date joined'), default=django_timezone.now)
     last_login = models.DateTimeField(_('last login'), blank=True, null=True)
     updated_at = models.DateTimeField(_('updated at'), auto_now=True)
     
@@ -116,14 +116,14 @@ class UserSession(SimpleModel):
     
     @property
     def is_expired(self):
-        return self.expires_at < timezone.now()
+        return self.expires_at < django_timezone.now()
     
     @property
     def is_active(self):
         return not self.is_expired and not self.revoked_at
     
     def revoke(self):
-        self.revoked_at = timezone.now()
+        self.revoked_at = django_timezone.now()
         self.save()
 
 
@@ -165,7 +165,7 @@ class LoginAttempt(SimpleModel):
     @classmethod
     def get_recent_failures_for_email(cls, email, minutes=15):
         from datetime import timedelta
-        cutoff = timezone.now() - timedelta(minutes=minutes)
+        cutoff = django_timezone.now() - timedelta(minutes=minutes)
         return cls.objects.filter(
             email=email,
             success=False,
@@ -175,7 +175,7 @@ class LoginAttempt(SimpleModel):
     @classmethod
     def get_recent_failures_for_ip(cls, ip_address, minutes=15):
         from datetime import timedelta
-        cutoff = timezone.now() - timedelta(minutes=minutes)
+        cutoff = django_timezone.now() - timedelta(minutes=minutes)
         return cls.objects.filter(
             ip_address=ip_address,
             success=False,

@@ -6,8 +6,6 @@ import hashlib
 import hmac
 import time
 
-User = get_user_model()
-
 
 class APIKeyAuthentication(BaseAuthentication):
     def authenticate(self, request):
@@ -29,6 +27,7 @@ class APIKeyAuthentication(BaseAuthentication):
         user_id = cache.get(cache_key)
         
         if user_id:
+            User = get_user_model()
             try:
                 return User.objects.get(id=user_id, is_active=True)
             except User.DoesNotExist:

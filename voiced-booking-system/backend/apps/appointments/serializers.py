@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from apps.core.serializers import TenantFilteredSerializer, BaseSerializer, DisplayFieldsMixin
-from .models import Appointment, Client
+from apps.clients.models import Client
+from .models import Appointment
 
 
 class ClientSerializer(TenantFilteredSerializer):

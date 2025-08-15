@@ -1,7 +1,7 @@
 from rest_framework import permissions
 from apps.core.viewsets import TenantViewSet
 from apps.core.permissions import BusinessStaffPermission
-from apps.appointments.models import Client
+from .models import Client
 from apps.appointments.serializers import ClientSerializer
 
 
