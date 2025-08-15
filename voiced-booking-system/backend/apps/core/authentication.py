@@ -75,26 +75,3 @@ class SignatureAuthentication(BaseAuthentication):
             message.encode(),
             hashlib.sha256
         ).hexdigest()
-
-
-class BusinessContextAuthentication(BaseAuthentication):
-    def authenticate(self, request):
-        business_id = request.headers.get('X-Business-ID')
-        if not business_id:
-            return None
-        
-        user = request.user
-        if not user or not user.is_authenticated:
-            return None
-        
-        try:
-            from apps.businesses.models import Business
-            business = Business.objects.get(
-                id=business_id,
-                members__user=user,
-                members__is_active=True
-            )
-            request.business = business
-            return (user, business)
-        except Business.DoesNotExist:
-            raise exceptions.AuthenticationFailed('Invalid business context')

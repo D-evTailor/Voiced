@@ -8,8 +8,10 @@ from apps.core.exceptions import success_response, error_response
 from .models import Business, BusinessHours, BusinessMember
 from .serializers import (
     BusinessSerializer, BusinessCreateSerializer, BusinessUpdateSerializer,
-    BusinessHoursSerializer, BusinessMemberSerializer
+    BusinessHoursSerializer, BusinessMemberSerializer, BusinessListSerializer,
+    AdditionalBusinessSerializer
 )
+from .onboarding_serializers import BusinessDashboardConfigSerializer, BusinessOnboardingStatusSerializer
 
 
 class BusinessViewSet(OptimizedViewSetMixin, BaseViewSet):
@@ -27,7 +29,11 @@ class BusinessViewSet(OptimizedViewSetMixin, BaseViewSet):
         ).distinct()
     
     def get_serializer_class(self):
-        if self.action == 'create':
+        if self.action == 'my_businesses':
+            return BusinessListSerializer
+        elif self.action == 'create_additional':
+            return AdditionalBusinessSerializer
+        elif self.action == 'create':
             return BusinessCreateSerializer
         elif self.action in ['update', 'partial_update']:
             return BusinessUpdateSerializer
@@ -35,6 +41,47 @@ class BusinessViewSet(OptimizedViewSetMixin, BaseViewSet):
     
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
+    
+    @action(detail=False, methods=['get'])
+    def my_businesses(self, request):
+        businesses = self.get_queryset()
+        serializer = self.get_serializer(businesses, many=True)
+        return success_response(data=serializer.data)
+    
+    @action(detail=False, methods=['post'])
+    def create_additional(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        business = serializer.save()
+        return success_response(
+            data={
+                'business_slug': business.slug,
+                'business_name': business.name,
+                'business_id': business.id
+            },
+            message="Additional business created successfully"
+        )
+    
+    @action(detail=True, methods=['get', 'patch'])
+    def dashboard_config(self, request, pk=None):
+        business = self.get_object()
+        config = business.dashboard_config
+        
+        if request.method == 'GET':
+            serializer = BusinessDashboardConfigSerializer(config)
+            return success_response(data=serializer.data)
+        
+        serializer = BusinessDashboardConfigSerializer(config, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return success_response(data=serializer.data, message="Dashboard config updated")
+    
+    @action(detail=True, methods=['get'])
+    def onboarding_status(self, request, pk=None):
+        business = self.get_object()
+        status = business.onboarding_status
+        serializer = BusinessOnboardingStatusSerializer(status)
+        return success_response(data=serializer.data)
     
     @action(detail=True, methods=['post'], permission_classes=[BusinessOwnerPermission])
     def add_member(self, request, pk=None):

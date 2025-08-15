@@ -9,7 +9,7 @@ from apps.core.exceptions import success_response, error_response
 from .models import UserProfile
 from .serializers import (
     UserSerializer, UserCreateSerializer, UserUpdateSerializer,
-    PasswordChangeSerializer, UserProfileSerializer
+    PasswordChangeSerializer, UserProfileSerializer, UserBusinessRegistrationSerializer
 )
 
 User = get_user_model()
@@ -36,17 +36,21 @@ class UserViewSet(BaseViewSet):
 
 
 class RegisterView(generics.CreateAPIView):
-    queryset = User.objects.all()
-    serializer_class = UserCreateSerializer
+    serializer_class = UserBusinessRegistrationSerializer
     permission_classes = [permissions.AllowAny]
     
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = serializer.save()
+        result = serializer.save()
+        
         return success_response(
-            data=UserSerializer(user).data,
-            message="User registered successfully"
+            data={
+                'user': UserSerializer(result['user']).data,
+                'business_slug': result['business'].slug,
+                'business_name': result['business'].name
+            },
+            message="Registration successful"
         )
 
 

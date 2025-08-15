@@ -88,8 +88,8 @@ const nextConfig = {
     return [
       {
         source: '/dashboard',
-        destination: '/dashboard/overview',
-        permanent: true,
+        destination: '/dashboard/select',
+        permanent: false,
       },
     ];
   },

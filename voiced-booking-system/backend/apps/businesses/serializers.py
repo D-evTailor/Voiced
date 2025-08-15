@@ -3,6 +3,37 @@ from apps.core.serializers import TenantFilteredSerializer, DisplayFieldsMixin
 from .models import Business, BusinessHours, BusinessMember
 
 
+class BusinessListSerializer(serializers.ModelSerializer):
+    member_role = serializers.SerializerMethodField()
+    is_primary = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Business
+        fields = ['id', 'name', 'slug', 'business_type', 'logo', 'member_role', 'is_primary']
+    
+    def get_member_role(self, obj):
+        user = self.context['request'].user
+        member = obj.members.filter(user=user).first()
+        return member.role if member else None
+    
+    def get_is_primary(self, obj):
+        user = self.context['request'].user
+        member = obj.members.filter(user=user).first()
+        return member.is_primary if member else False
+
+
+class AdditionalBusinessSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Business
+        fields = ['name', 'business_type', 'email', 'phone', 'address', 'city', 'state', 'postal_code', 'country']
+    
+    def create(self, validated_data):
+        from .services import BusinessRegistrationService
+        user = self.context['request'].user
+        service = BusinessRegistrationService()
+        return service.create_additional_business(user, validated_data)
+
+
 class BusinessHoursSerializer(serializers.ModelSerializer):
     day_name = serializers.CharField(source='get_day_of_week_display', read_only=True)
     is_open = serializers.BooleanField(read_only=True)

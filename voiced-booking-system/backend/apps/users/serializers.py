@@ -1,9 +1,53 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from apps.core.serializers import BaseSerializer
+from apps.core.choices import BUSINESS_TYPE_CHOICES
 from .models import UserProfile
 
 User = get_user_model()
+
+
+class UserBusinessRegistrationSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, min_length=8)
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150)
+    locale = serializers.CharField(max_length=10, default='es')
+    timezone = serializers.CharField(max_length=50, default='Europe/Madrid')
+    
+    business_name = serializers.CharField(max_length=200)
+    business_type = serializers.ChoiceField(choices=BUSINESS_TYPE_CHOICES, default='other')
+    business_email = serializers.EmailField()
+    business_phone = serializers.CharField(max_length=17)
+    
+    def validate(self, attrs):
+        if User.objects.filter(email=attrs['email']).exists():
+            raise serializers.ValidationError({'email': 'User with this email already exists'})
+        return attrs
+    
+    def create(self, validated_data):
+        from apps.businesses.services import BusinessRegistrationService
+        
+        user_data = {
+            'email': validated_data['email'],
+            'password': validated_data['password'],
+            'first_name': validated_data['first_name'],
+            'last_name': validated_data['last_name'],
+            'locale': validated_data['locale'],
+            'timezone': validated_data['timezone'],
+        }
+        
+        business_data = {
+            'name': validated_data['business_name'],
+            'business_type': validated_data['business_type'],
+            'email': validated_data['business_email'],
+            'phone': validated_data['business_phone'],
+        }
+        
+        service = BusinessRegistrationService()
+        user, business = service.create_user_with_business(user_data, business_data)
+        
+        return {'user': user, 'business': business}
 
 
 class UserProfileSerializer(serializers.ModelSerializer):

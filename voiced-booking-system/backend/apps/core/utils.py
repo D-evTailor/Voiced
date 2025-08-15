@@ -1,6 +1,7 @@
 import random
 import string
 from datetime import datetime
+from typing import Optional
 from django.utils.text import slugify
 from django.core.validators import RegexValidator
 from django.utils.translation import gettext_lazy as _
@@ -82,3 +83,10 @@ def get_nested_value(obj, path, default=None):
         return current
     except (KeyError, AttributeError, TypeError):
         return default
+
+
+def extract_business_slug_from_path(path: str) -> Optional[str]:
+    import re
+    pattern = r'/dashboard/([^/]+)/?'
+    match = re.search(pattern, path)
+    return match.group(1) if match else None

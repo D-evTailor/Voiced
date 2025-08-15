@@ -17,14 +17,14 @@ Best Practices Applied:
 8. Security: JWT + API key authentication, business context validation
 """
 
-API_ENDPOINTS = {
+API_CONFIG = {
     'auth': {
         'base': '/api/v1/auth/',
         'endpoints': [
             'token/',           # POST: Get JWT token
-            'token/refresh/',   # POST: Refresh JWT token  
+            'token/refresh/',   # POST: Refresh JWT token
             'token/verify/',    # POST: Verify JWT token
-            'register/',        # POST: User registration
+            'register/',        # POST: User + Business registration
             'me/',             # GET/PATCH: Current user info
             'change-password/', # POST: Change password
             'users/',          # GET/POST/PUT/DELETE: User management
@@ -33,11 +33,15 @@ API_ENDPOINTS = {
     'businesses': {
         'base': '/api/v1/businesses/',
         'endpoints': [
-            '',                # GET/POST: Business list/create
-            '{id}/',          # GET/PUT/PATCH/DELETE: Business detail
-            '{id}/add_member/', # POST: Add business member
-            'hours/',         # GET/POST/PUT/DELETE: Business hours
-            'members/',       # GET/POST/PUT/DELETE: Business members
+            '',                         # GET/POST: Business list/create
+            'my_businesses/',           # GET: List user's businesses
+            'create_additional/',       # POST: Create additional business
+            '{id}/',                   # GET/PUT/PATCH/DELETE: Business detail
+            '{id}/dashboard_config/',   # GET/PATCH: Dashboard configuration
+            '{id}/onboarding_status/',  # GET: Onboarding progress
+            '{id}/add_member/',        # POST: Add business member
+            'hours/',                  # GET/POST/PUT/DELETE: Business hours
+            'members/',                # GET/POST/PUT/DELETE: Business members
         ]
     },
     'services': {

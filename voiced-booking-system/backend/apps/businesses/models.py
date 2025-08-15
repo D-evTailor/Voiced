@@ -4,6 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from apps.core.mixins import BusinessModel, BaseFieldsMixin, BusinessStatsMixin
 from apps.core.utils import PHONE_REGEX_VALIDATOR
 from apps.core.choices import CURRENCY_CHOICES, BUSINESS_TYPE_CHOICES, LANGUAGE_CHOICES
+from .onboarding_models import BusinessDashboardConfig, BusinessOnboardingStatus
 
 
 class Business(BusinessModel, BusinessStatsMixin):
@@ -61,6 +62,26 @@ class Business(BusinessModel, BusinessStatsMixin):
     
     def __str__(self):
         return self.name
+    
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            from django.utils.text import slugify
+            base_slug = slugify(self.name)[:45]
+            slug = base_slug
+            counter = 1
+            
+            while Business.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+            
+            self.slug = slug
+        
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        
+        if is_new:
+            BusinessDashboardConfig.objects.create(business=self)
+            BusinessOnboardingStatus.objects.create(business=self)
     
     @property
     def full_address(self):

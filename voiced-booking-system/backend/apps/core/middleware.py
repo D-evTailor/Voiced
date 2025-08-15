@@ -5,6 +5,7 @@ from django.conf import settings
 from apps.businesses.models import Business
 from apps.users.models import LoginAttempt
 from .constants import RATE_LIMIT_CONFIG, USER_AGENT_MAX_LENGTH
+from .utils import extract_business_slug_from_path
 
 
 class BaseMiddleware(MiddlewareMixin):
@@ -25,12 +26,24 @@ class TenantMiddleware(BaseMiddleware):
         if not hasattr(request, 'user') or isinstance(request.user, AnonymousUser):
             return None
         
+        business_slug = extract_business_slug_from_path(request.path)
+        if business_slug:
+            try:
+                return Business.objects.get(
+                    slug=business_slug,
+                    members__user=request.user,
+                    members__is_active=True
+                )
+            except Business.DoesNotExist:
+                pass
+        
         business_id = request.headers.get('X-Business-ID')
         if business_id:
             try:
                 return Business.objects.get(
                     id=business_id,
-                    members__user=request.user
+                    members__user=request.user,
+                    members__is_active=True
                 )
             except Business.DoesNotExist:
                 pass
