@@ -1,0 +1,9 @@
+{
+    "github.copilot.chat.experimental.mcp.enabled": true,
+    "github.copilot.chat.experimental.features": {
+        "mcp": true
+    },
+    "copilot-mcp.enabled": true,
+    "copilot-mcp.autoStart": true,
+    "copilot-mcp.debug": true
+}

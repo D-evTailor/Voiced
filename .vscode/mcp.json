@@ -1,0 +1,13 @@
+{
+	"servers": {
+		"vapi": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@vapi-ai/mcp-docs-server"
+			],
+			"type": "stdio"
+		}
+	},
+	"inputs": []
+}
