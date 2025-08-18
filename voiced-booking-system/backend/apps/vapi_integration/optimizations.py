@@ -1,6 +1,10 @@
 from apps.core.cache import cache_service
 from functools import wraps
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union, Callable
+from django.core.cache import cache
+from django.utils import timezone
+import hashlib
+import inspect
 
 
 class VapiCacheKeys:
@@ -54,6 +58,55 @@ class VapiCacheService:
             value = default_func()
             self.set(key, value, ttl)
         return value
+
+
+def cached_method(timeout: int = 3600, key_func: Optional[Callable] = None):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if key_func:
+                cache_key = key_func(*args, **kwargs)
+            else:
+                sig = inspect.signature(func)
+                bound_args = sig.bind(*args, **kwargs)
+                bound_args.apply_defaults()
+                key_data = f"{func.__module__}.{func.__name__}:{bound_args.arguments}"
+                cache_key = hashlib.md5(key_data.encode()).hexdigest()
+            
+            result = cache.get(cache_key)
+            if result is None:
+                result = func(*args, **kwargs)
+                cache.set(cache_key, result, timeout)
+            return result
+        return wrapper
+    return decorator
+
+
+def circuit_breaker(max_failures: int = 5, timeout: int = 60):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            cache_key = f"circuit_breaker:{func.__module__}.{func.__name__}"
+            failures = cache.get(f"{cache_key}:failures", 0)
+            
+            if failures >= max_failures:
+                last_failure = cache.get(f"{cache_key}:last_failure")
+                if last_failure and (timezone.now().timestamp() - last_failure) < timeout:
+                    raise Exception("Circuit breaker is open")
+                else:
+                    cache.delete(f"{cache_key}:failures")
+                    cache.delete(f"{cache_key}:last_failure")
+            
+            try:
+                result = func(*args, **kwargs)
+                cache.delete(f"{cache_key}:failures")
+                return result
+            except Exception as e:
+                cache.set(f"{cache_key}:failures", failures + 1, timeout * 2)
+                cache.set(f"{cache_key}:last_failure", timezone.now().timestamp(), timeout * 2)
+                raise e
+        return wrapper
+    return decorator
 
 
 vapi_cache_service = VapiCacheService(cache_service)

@@ -1,9 +1,3 @@
-"""
-Development settings for VoiceAppoint project.
-
-This module contains settings specific to local development environment.
-"""
-
 from .base import *
 
 # Debug toolbar for development

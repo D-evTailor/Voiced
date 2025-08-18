@@ -37,8 +37,7 @@ services:
       dockerfile: Dockerfile
       target: development
     command: >
-      sh -c "poetry run python manage.py migrate --noinput &&
-             poetry run python manage.py runserver 0.0.0.0:8000"
+      sh -c "poetry run python manage.py runserver 0.0.0.0:8000 --skip-checks"
     volumes:
       - ./backend:/app
       - backend_static:/app/static
@@ -91,7 +90,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: development
-    command: poetry run celery -A core worker -l info
+    command: celery -A core worker -l info
     volumes:
       - ./backend:/app
     depends_on:

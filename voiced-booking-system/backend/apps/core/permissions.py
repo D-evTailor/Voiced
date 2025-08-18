@@ -11,6 +11,13 @@ class TenantPermission(BasePermission):
         return True
 
 
+class IsBusinessMember(BasePermission):
+    def has_permission(self, request, view):
+        if not hasattr(request, 'business') or not request.business:
+            return False
+        return request.business.members.filter(user=request.user, is_active=True).exists()
+
+
 class BusinessPermission(BasePermission):
     required_permission = None
     

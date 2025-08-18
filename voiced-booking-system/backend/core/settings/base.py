@@ -1,13 +1,3 @@
-"""
-Base Django settings for VoiceAppoint project.
-
-This module contains settings that are common across all environments.
-Environment-specific settings should be placed in the appropriate files:
-- development.py for local development
-- production.py for production environment
-- testing.py for test environment
-"""
-
 import os
 from pathlib import Path
 from decouple import config
